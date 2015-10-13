@@ -1,0 +1,4 @@
+install_location: /opt
+default_branch: develop
+gpg_key: 77BBQGPGKEY
+workspace_base: /tmp/tmp.L59BThQzBy
