@@ -401,11 +401,7 @@ source {venv.activate}
 
         fpm += args
 
-        # Jump out of virtualenv for fpm
-        oldpath = os.getenv('PATH')
-        os.putenv('PATH', oldpath.split(':', 1)[-1])
         self._cmd(fpm)
-        os.putenv('PATH', oldpath)
 
         if self.build.package_target == 'deb':
             self.sign_debs()
