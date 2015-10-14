@@ -16,6 +16,7 @@ class Sideloader(object):
 
     debug = False
     deploy_file = '.deploy.yaml'
+    sign = True
     _overrides = {}
 
     def __init__(self, config, repo, build, deploy_type):
@@ -329,7 +330,7 @@ NAME={name}
 
         self._cmd(fpm)
 
-        if self.build.package_target == 'deb':
+        if self.build.package_target == 'deb' and self.sign:
             self.sign_debs()
 
         self._log('Build completed successfully')

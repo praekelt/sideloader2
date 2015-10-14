@@ -22,8 +22,12 @@ from sideloader import Build, Config, GitRepo, Sideloader
               type=click.Path())
 @click.option('--debug/--no-debug', help='Log additional debug information',
               default=False)
+@click.option('--sign/--no-sign',
+              help='Enable GPG signing of .deb packages (requires a key to be '
+                   'configured)',
+              default=True)
 def main(git_url, branch, build, id, deploy_file, name,
-         build_script, postinst_script, dtype, packman, config, debug):
+         build_script, postinst_script, dtype, packman, config, debug, sign):
     config = Config.from_config_file(config)
     repo = GitRepo.from_github_url(git_url, branch)
     build_def = Build(id, packman)
@@ -32,6 +36,7 @@ def main(git_url, branch, build, id, deploy_file, name,
     sideloader = Sideloader(config, repo, build_def, deploy_type)
     sideloader.debug = debug
     sideloader.deploy_file = deploy_file
+    sideloader.sign = sign
     sideloader.set_deploy_overrides(
         name=name, buildscript=build_script, postinstall=postinst_script,
         version='0.%s' % build)
