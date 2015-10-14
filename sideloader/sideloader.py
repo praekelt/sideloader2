@@ -330,7 +330,7 @@ source {venv.activate}
                                         'postinstall.sh')
         with open(postinstall_path, 'w') as postinstall_file:
             postinstall_file.write(content)
-        os.chmod(postinstall_path, 0777)
+        os.chmod(postinstall_path, 0755)
 
     def build_package(self):
         """ Run the fpm command that builds the package. """
