@@ -8,6 +8,7 @@ import yaml
 from collections import namedtuple
 from urlparse import urlparse
 
+from config_files import ConfigFiles
 from utils import create_venv_paths, listdir_abs, rmtree_if_exists
 
 
@@ -195,8 +196,7 @@ class Sideloader(object):
         os.makedirs(self.ws_paths.package)
 
         self.copy_build()
-        self.copy_nginx_configs()
-        self.copy_supervisor_configs()
+        self.copy_config_files()
 
     def copy_build(self):
         """ Copy build contents to install location. """
@@ -221,28 +221,19 @@ class Sideloader(object):
             dest_path, '%s-requirements.pip' % self.deploy.name)
         self._cmd([self.build_venv.pip, 'freeze', '>', requirements_path])
 
-    def copy_nginx_configs(self):
-        """ Copy any nginx configs into etc/nginx/sites-enabled. """
-        if not self.deploy.nginx:
-            return
+    def copy_config_files(self):
+        """
+        Copy the config files specified in the deploy over to the relevant
+        config directory within the package.
+        """
+        for config_files in self.deploy.config_files:
+            config_dir_path = os.path.join(self.ws_paths.package,
+                                           config_files.config_dir_path)
+            os.makedirs(config_dir_path)
 
-        nginx_path = os.path.join(self.ws_paths.package,
-                                  'etc', 'nginx', 'sites-enabled')
-        os.makedirs(nginx_path)
-        for conf in self.deploy.nginx:
-            shutil.copy(os.path.join(self.ws_paths.build, conf), nginx_path)
-
-    def copy_supervisor_configs(self):
-        """ Copy any supervisor configs into etc/supervisor/conf.d. """
-        if not self.deploy.supervisor:
-            return
-
-        supervisor_path = os.path.join(self.ws_paths.package,
-                                       'etc', 'supervisor', 'conf.d')
-        os.makedirs(supervisor_path)
-        for conf in self.deploy.supervisor:
-            shutil.copy(os.path.join(self.ws_paths.build, conf),
-                        supervisor_path)
+            for config_file in config_files.files:
+                shutil.copy(os.path.join(self.ws_paths.build, config_file),
+                            config_dir_path)
 
     def create_postinstall_script(self):
         """ Generate the postinstall script and write it to disk. """
@@ -323,8 +314,7 @@ NAME={name}
         if not self.deploy_type.provides_version:
             fpm += ['-v', self.deploy.version]
 
-        deps = self.deploy.dependencies + self.deploy_type.dependencies
-        fpm += sum([['-d', dep] for dep in deps], [])
+        fpm += sum([['-d', dep] for dep in self.list_all_dependencies()], [])
 
         if self.deploy.user:
             fpm += ['--%s-user' % self.build.package_target, self.deploy.user]
@@ -340,6 +330,21 @@ NAME={name}
             self.sign_debs()
 
         self._log('Build completed successfully')
+
+    def list_all_dependencies(self):
+        """ Get a list of all the package dependencies. """
+        deps = []
+        # Dependencies defined in the deploy file
+        deps += self.deploy.dependencies
+
+        # Dependencies from the deployment type
+        deps += self.deploy_type.dependencies
+
+        # Dependencies from the config files
+        for config_files in self.deploy.config_files:
+            deps += config_files.dependencies
+
+        return deps
 
     def sign_debs(self):
         """ Sign the .deb file with the configured gpg key. """
@@ -397,8 +402,8 @@ class GitRepo(object):
 
 
 class Deploy(object):
-    def __init__(self, name=None, buildscript=None, postinstall=None, nginx=[],
-                 supervisor=[], pip=[], dependencies=[],
+    def __init__(self, name=None, buildscript=None, postinstall=None,
+                 config_files=[], pip=[], dependencies=[],
                  virtualenv_prefix=None, allow_broken_build=False, user=None,
                  version=None):
         """
@@ -408,8 +413,7 @@ class Deploy(object):
         self.name = name
         self.buildscript = buildscript
         self.postinstall = postinstall
-        self.nginx = nginx
-        self.supervisor = supervisor
+        self.config_files = config_files
         self.pip = pip
         self.dependencies = dependencies
         self.virtualenv_prefix = virtualenv_prefix
@@ -422,12 +426,20 @@ class Deploy(object):
         with open(deploy_file_path) as deploy_file:
             deploy_yaml = yaml.load(deploy_file)
 
+        config_files = []
+        nginx_files = deploy_yaml.get('nginx')
+        if nginx_files:
+            config_files.append(ConfigFiles.nginx(nginx_files))
+
+        supervisor_files = deploy_yaml.get('supervisor')
+        if supervisor_files:
+            config_files.append(ConfigFiles.supervisor(supervisor_files))
+
         return Deploy(
             deploy_yaml.get('name'),
             deploy_yaml.get('buildscript'),
             deploy_yaml.get('postinstall'),
-            deploy_yaml.get('nginx', []),
-            deploy_yaml.get('supervisor', []),
+            config_files,
             deploy_yaml.get('pip', []),
             deploy_yaml.get('dependencies'),
             deploy_yaml.get('virtualenv_prefix'),
@@ -441,9 +453,9 @@ class Deploy(object):
         Override attributes in this Deploy instance and return a new instance
         with the values given. Overrides with a None value will be ignored.
         """
-        attrs = ['name', 'buildscript', 'postinstall', 'nginx', 'supervisor',
-                 'pip', 'dependencies', 'virtualenv_prefix',
-                 'allow_broken_build', 'user', 'version']
+        attrs = ['name', 'buildscript', 'postinstall', 'config_files', 'pip',
+                 'dependencies', 'virtualenv_prefix', 'allow_broken_build',
+                 'user', 'version']
         kwargs = {}
         for attr in attrs:
             kwargs[attr] = getattr(self, attr)
