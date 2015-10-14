@@ -8,6 +8,8 @@ import yaml
 from collections import namedtuple
 from urlparse import urlparse
 
+from utils import create_venv_paths, listdir_abs, rmtree_if_exists
+
 
 class Sideloader(object):
 
@@ -41,24 +43,7 @@ class Sideloader(object):
         }
         self.ws_paths = namedtuple('WsPaths', ws.keys())(**ws)
 
-        self.build_venv = self.create_venv_paths(workspace_path)
-
-    def create_venv_paths(self, root_path, venv_dir='ve'):
-        """
-        Creates a named tuple of virtualenv paths, given that a virtualenv is
-        created in ``root_path/venv_dir``.
-        """
-        venv_path = os.path.join(root_path, venv_dir)
-        venv_bin_path = os.path.join(venv_path, 'bin')
-        venv = {
-            'venv': venv_path,
-            'bin': venv_bin_path,
-            'activate': os.path.join(venv_bin_path, 'activate'),
-            'pip': os.path.join(venv_bin_path, 'pip'),
-            'python': os.path.join(venv_bin_path, 'python')
-        }
-
-        return namedtuple('VenvPaths', venv.keys())(**venv)
+        self.build_venv = create_venv_paths(workspace_path)
 
     def init_env(self):
         """ Initialises the current working environment. """
@@ -132,15 +117,9 @@ class Sideloader(object):
 
     def clean_workspace(self):
         """ Clean up the workspace directory (but not the virtualenv). """
-        self._rmtree_if_exists(self.ws_paths.repo)
-        self._rmtree_if_exists(self.ws_paths.build)
-        self._rmtree_if_exists(self.ws_paths.package)
-
-    def _rmtree_if_exists(self, path):
-        if os.path.exists(path):
-            shutil.rmtree(path)
-            return True
-        return False
+        rmtree_if_exists(self.ws_paths.repo)
+        rmtree_if_exists(self.ws_paths.build)
+        rmtree_if_exists(self.ws_paths.package)
 
     def fetch_repo(self):
         """ Clone the repo and checkout the desired branch. """
@@ -336,7 +315,7 @@ source {venv.activate}
         else:
             venv_dir = 'python'
 
-        return self.create_venv_paths(self.config.install_location, venv_dir)
+        return create_venv_paths(self.config.install_location, venv_dir)
 
     def read_postinstall_file(self):
         """ Read the user's postinstall file. """
@@ -416,9 +395,8 @@ source {venv.activate}
         # Find all the .debs in the directory and indiscriminately sign them
         # (there should only be 1)
         # TODO: Get the actual package name from fpm
-        debs = [os.path.join(self.ws_paths.package, f)
-                for f in os.listdir(self.ws_paths.package)
-                if f.endswith('.deb')]
+        debs = [path for path in listdir_abs(self.ws_paths.package)
+                if os.path.splitext(path)[1] == '.deb']
         for deb in debs:
             self._cmd(['dpkg-sig', '-k', self.config.gpg_key, '--sign',
                        'builder', deb])
