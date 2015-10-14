@@ -39,21 +39,21 @@ VenvPaths = namedtuple('VenvPath',
                        ['venv', 'bin', 'activate', 'pip', 'python'])
 
 
-def create_venv_paths(root_path, venv_dir='ve'):
+def create_venv_paths(root_path, name='ve'):
     """
     Create a VenvPaths named tuple of common virtualenv paths.
 
     :param: root_path:
     The path in which to create the virtualenv directory.
 
-    :param: venv_dir:
-    The name of the virtualenv directory. Defaults to 've'.
+    :param: name:
+    The name of the virtualenv. Defaults to 've'.
 
     :returns:
     The VenvPaths named tuple containing the path to the virtualenv, the bin
     directory, the activate script, pip, and python.
     """
-    venv_path = os.path.join(root_path, venv_dir)
+    venv_path = os.path.join(root_path, name)
     venv_bin_path = os.path.join(venv_path, 'bin')
     return VenvPaths(
         venv=venv_path,
