@@ -217,9 +217,12 @@ class Sideloader(object):
 
     def freeze_virtualenv(self, dest_path):
         """ Freeze post build requirements. """
+        freeze_output = self._cmd([self.build_venv.pip, 'freeze'])
+
         requirements_path = os.path.join(
             dest_path, '%s-requirements.pip' % self.deploy.name)
-        self._cmd([self.build_venv.pip, 'freeze', '>', requirements_path])
+        with open(requirements_path, 'w') as requirements_file:
+            requirements_file.write(freeze_output)
 
     def copy_nginx_configs(self):
         """ Copy any nginx configs into etc/nginx/sites-enabled. """

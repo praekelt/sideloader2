@@ -75,6 +75,9 @@ class VirtualEnv(DeployType):
     def get_set_up_script(self, deploy, install_location):
         install_venv = create_venv_paths(
             install_location, self._get_venv_name(deploy))
+        frozen_requirements = os.path.join(
+            install_location, '%s-requirements.pip' % deploy.name)
+
         return """# Create and activate the virtualenv
 if [ ! -f {venv.python} ]; then
     /usr/bin/virtualenv {venv.venv}
@@ -84,8 +87,8 @@ source {venv.activate}
 
 # Upgrade pip and re-install pip requirements
 {venv.pip} install --upgrade pip
-{venv.pip} install --upgrade -r {name}-requirements.pip""".format(
-            venv=install_venv, name=deploy.name)
+{venv.pip} install --upgrade -r {frozen_requirements}""".format(
+            venv=install_venv, frozen_requirements=frozen_requirements)
 
     def _get_venv_name(self, deploy):
         if deploy.virtualenv_prefix is not None:
