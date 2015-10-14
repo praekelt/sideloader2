@@ -1,5 +1,7 @@
 import click
 
+import deploy_types
+
 from sideloader import Build, Config, GitRepo, Sideloader
 
 
@@ -12,7 +14,8 @@ from sideloader import Build, Config, GitRepo, Sideloader
 @click.option('--name', help='Package name')
 @click.option('--build-script', help='Build script relative path')
 @click.option('--postinst-script', help='Post-install script relative path')
-@click.option('--dtype', help='Deploy type', default='virtualenv')
+@click.option('--dtype', help='Deploy type', default='virtualenv',
+              type=click.Choice(['dir', 'python', 'virtualenv']))
 @click.option('--packman', help='Package manager', default='deb',
               type=click.Choice(['deb', 'rpm']))
 @click.option('--config', help='Sideloader config', default='config.yaml',
@@ -23,9 +26,10 @@ def main(git_url, branch, build, id, deploy_file, name,
          build_script, postinst_script, dtype, packman, config, debug):
     config = Config.from_config_file(config)
     repo = GitRepo.from_github_url(git_url, branch)
-    build_def = Build(id, dtype, packman)
+    build_def = Build(id, packman)
+    deploy_type = _get_deploy_type(dtype)
 
-    sideloader = Sideloader(config, repo, build_def)
+    sideloader = Sideloader(config, repo, build_def, deploy_type)
     sideloader.debug = debug
     sideloader.deploy_file = deploy_file
     sideloader.set_deploy_overrides(
@@ -35,3 +39,12 @@ def main(git_url, branch, build, id, deploy_file, name,
     sideloader.create_workspace()
     sideloader.run_buildscript()
     sideloader.create_package()
+
+
+def _get_deploy_type(dtype):
+    if dtype == 'python':
+        return deploy_types.Python()
+    elif dtype == 'virtualenv':
+        return deploy_types.VirtualEnv()
+
+    return deploy_types.DeployType()

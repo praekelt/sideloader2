@@ -8,6 +8,8 @@ import yaml
 from collections import namedtuple
 from urlparse import urlparse
 
+from utils import create_venv_paths, listdir_abs, rmtree_if_exists
+
 
 class Sideloader(object):
 
@@ -15,10 +17,11 @@ class Sideloader(object):
     deploy_file = '.deploy.yaml'
     _overrides = {}
 
-    def __init__(self, config, repo, build):
+    def __init__(self, config, repo, build, deploy_type):
         self.config = config
         self.repo = repo
         self.build = build
+        self.deploy_type = deploy_type
 
         # TODO: this, nicer
         if not repo.branch:
@@ -41,24 +44,7 @@ class Sideloader(object):
         }
         self.ws_paths = namedtuple('WsPaths', ws.keys())(**ws)
 
-        self.build_venv = self.create_venv_paths(workspace_path)
-
-    def create_venv_paths(self, root_path, venv_dir='ve'):
-        """
-        Creates a named tuple of virtualenv paths, given that a virtualenv is
-        created in ``root_path/venv_dir``.
-        """
-        venv_path = os.path.join(root_path, venv_dir)
-        venv_bin_path = os.path.join(venv_path, 'bin')
-        venv = {
-            'venv': venv_path,
-            'bin': venv_bin_path,
-            'activate': os.path.join(venv_bin_path, 'activate'),
-            'pip': os.path.join(venv_bin_path, 'pip'),
-            'python': os.path.join(venv_bin_path, 'python')
-        }
-
-        return namedtuple('VenvPaths', venv.keys())(**venv)
+        self.build_venv = create_venv_paths(workspace_path)
 
     def init_env(self):
         """ Initialises the current working environment. """
@@ -113,8 +99,7 @@ class Sideloader(object):
 
         self.deploy = self.load_deploy()
 
-        if self.build.deploy_type == 'virtualenv':
-            self.create_build_virtualenv()
+        self.create_build_virtualenv()
 
         os.putenv('NAME', self.deploy.name)
 
@@ -132,15 +117,9 @@ class Sideloader(object):
 
     def clean_workspace(self):
         """ Clean up the workspace directory (but not the virtualenv). """
-        self._rmtree_if_exists(self.ws_paths.repo)
-        self._rmtree_if_exists(self.ws_paths.build)
-        self._rmtree_if_exists(self.ws_paths.package)
-
-    def _rmtree_if_exists(self, path):
-        if os.path.exists(path):
-            shutil.rmtree(path)
-            return True
-        return False
+        rmtree_if_exists(self.ws_paths.repo)
+        rmtree_if_exists(self.ws_paths.build)
+        rmtree_if_exists(self.ws_paths.package)
 
     def fetch_repo(self):
         """ Clone the repo and checkout the desired branch. """
@@ -234,10 +213,9 @@ class Sideloader(object):
                     directory, type(e), e))
                 self.fail_build('Error copying files to package')
 
-        if self.build.deploy_type == 'virtualenv':
-            self._freeze_virtualenv(dest_path)
+        self.freeze_virtualenv(dest_path)
 
-    def _freeze_virtualenv(self, dest_path):
+    def freeze_virtualenv(self, dest_path):
         """ Freeze post build requirements. """
         requirements_path = os.path.join(
             dest_path, '%s-requirements.pip' % self.deploy.name)
@@ -279,14 +257,11 @@ class Sideloader(object):
         self._log('Constructing postinstall script')
 
         # Insert some scripting before the user's script to set up...
-        set_up = ''
-        if self.build.deploy_type == 'virtualenv':
-            set_up = self.generate_virtualenv_set_up()
+        set_up = self.deploy_type.get_set_up_script(
+            self.deploy, self.config.install_location)
 
         # ...and afterwards to tear down.
-        tear_down = ''
-        if self.build.deploy_type == 'virtualenv':
-            tear_down = 'deactivate'
+        tear_down = self.deploy_type.get_tear_down_script()
 
         user_postinstall = ''
         if self.deploy.postinstall:
@@ -313,31 +288,6 @@ NAME={name}
             name=self.deploy.name,
             user_postinstall=user_postinstall)
 
-    def generate_virtualenv_set_up(self):
-        """ Generate the set up scripting for virtualenv deployments. """
-        install_venv = self._create_install_venv_paths()
-        return """# Create and activate the virtualenv
-if [ ! -f {venv.python} ]; then
-    /usr/bin/virtualenv {venv.venv}
-fi
-VENV={venv.venv}
-source {venv.activate}
-
-# Upgrade pip and re-install pip requirements
-{venv.pip} install --upgrade pip
-{venv.pip} install --upgrade -r {name}-requirements.pip""".format(
-            venv=install_venv, name=self.deploy.name)
-
-    def _create_install_venv_paths(self):
-        # Paths for post-install time
-        if self.deploy.virtualenv_prefix is not None:
-            # TODO: Strip '/' to avoid path shenanigans?
-            venv_dir = '%s-python' % self.deploy.virtualenv_prefix
-        else:
-            venv_dir = 'python'
-
-        return self.create_venv_paths(self.config.install_location, venv_dir)
-
     def read_postinstall_file(self):
         """ Read the user's postinstall file. """
         postinstall_path = os.path.join(self.ws_paths.repo,
@@ -351,26 +301,10 @@ source {venv.activate}
                                         'postinstall.sh')
         with open(postinstall_path, 'w') as postinstall_file:
             postinstall_file.write(content)
-        os.chmod(postinstall_path, 0777)
+        os.chmod(postinstall_path, 0755)
 
     def build_package(self):
         """ Run the fpm command that builds the package. """
-        # Preserving behaviour... prefer the deploy file version
-        version = self.deploy.version
-
-        if self.build.deploy_type == 'virtualenv':
-            deploy_type = 'dir'
-            prefix = '/'
-            args = os.listdir(self.ws_paths.package)
-        elif self.build.deploy_type == 'python':
-            deploy_type = 'python'
-            args = [os.path.join(self.ws_paths.repo, 'setup.py')]
-            version = None  # Get the version from setup.py
-        else:
-            deploy_type = 'dir'
-            prefix = '/'
-            args = os.listdir(self.ws_paths.package)
-
         self._log('Building .%s package' % self.build.package_target)
 
         postinstall_path = os.path.join(self.ws_paths.workspace,
@@ -379,19 +313,18 @@ source {venv.activate}
             'fpm',
             '-C', self.ws_paths.package,
             '-p', self.ws_paths.package,
-            '-s', deploy_type,
+            '-s', self.deploy_type.fpm_deploy_type,
             '-t', self.build.package_target,
             '-a', 'amd64',
             '-n', self.deploy.name,
-            '-v', version,
             '--after-install', postinstall_path,
         ]
 
-        if prefix:
-            fpm += ['--prefix', prefix]
+        if not self.deploy_type.provides_version:
+            fpm += ['-v', self.deploy.version]
 
-        if self.deploy.dependencies:
-            fpm += sum([['-d', dep] for dep in self.deploy.dependencies], [])
+        deps = self.deploy.dependencies + self.deploy_type.dependencies
+        fpm += sum([['-d', dep] for dep in deps], [])
 
         if self.deploy.user:
             fpm += ['--%s-user' % self.build.package_target, self.deploy.user]
@@ -399,13 +332,9 @@ source {venv.activate}
         if self.debug:
             fpm.append('--debug')
 
-        fpm += args
+        fpm += self.deploy_type.get_fpm_args(self.ws_paths)
 
-        # Jump out of virtualenv for fpm
-        oldpath = os.getenv('PATH')
-        os.putenv('PATH', oldpath.split(':', 1)[-1])
         self._cmd(fpm)
-        os.putenv('PATH', oldpath)
 
         if self.build.package_target == 'deb':
             self.sign_debs()
@@ -420,9 +349,8 @@ source {venv.activate}
         # Find all the .debs in the directory and indiscriminately sign them
         # (there should only be 1)
         # TODO: Get the actual package name from fpm
-        debs = [os.path.join(self.ws_paths.package, f)
-                for f in os.listdir(self.ws_paths.package)
-                if f.endswith('.deb')]
+        debs = [path for path in listdir_abs(self.ws_paths.package)
+                if os.path.splitext(path)[1] == '.deb']
         for deb in debs:
             self._cmd(['dpkg-sig', '-k', self.config.gpg_key, '--sign',
                        'builder', deb])
@@ -529,7 +457,6 @@ class Deploy(object):
 
 class Build(object):
     """ Container class for the build settings. """
-    def __init__(self, workspace_id, deploy_type, package_target):
+    def __init__(self, workspace_id, package_target):
         self.workspace_id = workspace_id
-        self.deploy_type = deploy_type
         self.package_target = package_target
