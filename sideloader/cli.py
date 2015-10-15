@@ -1,8 +1,6 @@
 import click
 
-import deploy_types
-
-from sideloader import Build, Config, GitRepo, Sideloader
+from sideloader import Sideloader
 
 
 @click.command()
@@ -28,28 +26,6 @@ from sideloader import Build, Config, GitRepo, Sideloader
               default=True)
 def main(git_url, branch, build, id, deploy_file, name,
          build_script, postinst_script, dtype, packman, config, debug, sign):
-    config = Config.from_config_file(config)
-    repo = GitRepo.from_github_url(git_url, branch)
-    build_def = Build(id, packman)
-    deploy_type = _get_deploy_type(dtype)
-
-    sideloader = Sideloader(config, repo, build_def, deploy_type)
-    sideloader.debug = debug
-    sideloader.deploy_file = deploy_file
-    sideloader.sign = sign
-    sideloader.set_deploy_overrides(
-        name=name, buildscript=build_script, postinstall=postinst_script,
-        version='0.%s' % build)
-
-    sideloader.create_workspace()
-    sideloader.run_buildscript()
-    sideloader.create_package()
-
-
-def _get_deploy_type(dtype):
-    if dtype == 'python':
-        return deploy_types.Python()
-    elif dtype == 'virtualenv':
-        return deploy_types.VirtualEnv()
-
-    return deploy_types.DeployType()
+    sideloader = Sideloader(config, git_url, branch, id, debug)
+    sideloader.run(deploy_file, dtype, packman, build, sign, name=name,
+                   buildscript=build_script, postinstall=postinst_script)

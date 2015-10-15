@@ -29,15 +29,15 @@ class DeployType(object):
         self.dependencies = dependencies
         self.provides_version = provides_version
 
-    def get_set_up_script(self, deploy, install_location):
+    def get_set_up_script(self, workspace, deploy):
         """
         Generate scripting to inject before the user's postinstall script.
 
-        :param: deploy:
-        The final deploy object.
+        :param: workspace:
+        The workspace for the build.
 
         :param: install_location:
-        The path to the install location.
+        The loaded deploy configuration.
         """
         return ''
 
@@ -72,11 +72,11 @@ class VirtualEnv(DeployType):
     def __init__(self):
         super(VirtualEnv, self).__init__(dependencies=['python-virtualenv'])
 
-    def get_set_up_script(self, deploy, install_location):
+    def get_set_up_script(self, workspace, deploy):
         install_venv = create_venv_paths(
-            install_location, self._get_venv_name(deploy))
+            workspace.install_location, self._get_venv_name(deploy))
         frozen_requirements = os.path.join(
-            install_location, '%s-requirements.pip' % deploy.name)
+            workspace.install_location, '%s-requirements.pip' % deploy.name)
 
         return """# Create and activate the virtualenv
 if [ ! -f {venv.python} ]; then

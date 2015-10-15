@@ -1,7 +1,37 @@
 import os
 import shutil
+import subprocess
+import sys
+import time
 
 from collections import namedtuple
+
+
+def log(message):
+    """ Log a timestamped message to stdout. """
+    sys.stdout.write('[%s] %s\n' % (time.ctime(), message))
+    sys.stdout.flush()
+
+
+def args_str(args):
+    """ Convert a list of arguments to a string. """
+    if isinstance(args, list):
+        return ' '.join(args)
+
+    return str(args)
+
+
+def cmd(args, debug=False):
+    """ Run the given command. """
+    if debug:
+        log(args_str(args))
+
+    output = subprocess.check_output(args, shell=False)
+
+    if debug:
+        log(output)
+
+    return output
 
 
 def rmtree_if_exists(tree_path):

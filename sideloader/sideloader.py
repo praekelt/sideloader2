@@ -1,175 +1,209 @@
 import os
 import shutil
-import subprocess
-import sys
-import time
 import yaml
 
 from collections import namedtuple
 from urlparse import urlparse
 
+import deploy_types
+
 from config_files import ConfigFiles
-from utils import create_venv_paths, listdir_abs, rmtree_if_exists
+from utils import cmd, create_venv_paths, listdir_abs, log, rmtree_if_exists
 
 
-class Sideloader(object):
+class Workspace(object):
+    """
+    Keeps track of the various file paths in the workspace and downloads the
+    source from github.
+    """
 
     debug = False
-    deploy_file = '.deploy.yaml'
-    sign = True
-    _overrides = {}
 
-    def __init__(self, config, repo, build, deploy_type):
-        self.config = config
+    def __init__(self, workspace_id, workspace_base, install_location, repo):
+        self.install_location = install_location
         self.repo = repo
-        self.build = build
-        self.deploy_type = deploy_type
 
-        # TODO: this, nicer
-        if not repo.branch:
-            repo.branch = config.default_branch
+        self._init_paths(workspace_id, workspace_base, install_location)
 
-        self._init_build_paths()
-        self.init_env()
+    def _init_paths(self, workspace_id, workspace_base, install_location):
+        """ Initialise the paths to various directories in the workspace. """
+        self._dir = os.path.abspath(os.path.join(workspace_base, workspace_id))
 
-    def _init_build_paths(self):
-        """ Initialise all the paths in the workspace and build virtualenv. """
-        # Default to the repo name if no workspace ID is configured
-        workspace_id = (self.build.workspace_id
-                        if self.build.workspace_id else self.repo.name)
-        workspace_path = os.path.join(self.config.workspace_base, workspace_id)
-        ws = {
-            'workspace': workspace_path,
-            'repo': os.path.join(workspace_path, self.repo.name),
-            'build': os.path.join(workspace_path, 'build'),
-            'package': os.path.join(workspace_path, 'package')
+        package_path = os.path.join(self._dir, 'package')
+        dirs = {
+            'repo': os.path.join(self._dir, self.repo.name),
+            'build': os.path.join(self._dir, 'build'),
+            'package': package_path,
+            'install': os.path.join(package_path,
+                                    install_location.lstrip('/'))
         }
-        self.ws_paths = namedtuple('WsPaths', ws.keys())(**ws)
-
-        self.build_venv = create_venv_paths(workspace_path)
-
-    def init_env(self):
-        """ Initialises the current working environment. """
-        env = {
-            'VENV': self.build_venv.venv,
-            'PIP': self.build_venv.pip,
-            'REPO': self.repo.name,
-            'BRANCH': self.repo.branch,
-            'WORKSPACE': self.ws_paths.workspace,
-            'BUILDDIR': self.ws_paths.build,
-            'INSTALLDIR': self.config.install_location,
-            'PATH': ':'.join([self.build_venv.bin, os.getenv('PATH')])
-        }
-        for k, v in env.items():
-            os.putenv(k, v)
-
-    def set_deploy_overrides(self, **kwargs):
-        """ Override any parameters in the deploy file. """
-        self._overrides = kwargs
-
-    def _log(self, s):
-        """ Log a timestamped message to stdout. """
-        sys.stdout.write('[%s] %s\n' % (time.ctime(), s))
-        sys.stdout.flush()
-
-    def _args_str(self, args):
-        """ Convert a list of arguments to a string. """
-        if isinstance(args, list):
-            return ' '.join(args)
-
-        return str(args)
+        self._dirs = namedtuple('WorkspaceDirs', dirs.keys())(**dirs)
 
     def _cmd(self, args):
-        """ Run the given command. """
-        if self.debug:
-            self._log(self._args_str(args))
+        return cmd(args, debug=self.debug)
 
-        output = subprocess.check_output(args, shell=False)
-
-        if self.debug:
-            self._log(output)
-
-        return output
-
-    def create_workspace(self):
+    def set_up(self):
         """
-        Cleans the current workspace, fetches the repo and sets up a virtualenv
-        for the install.
+        Create the workspace and fetch the repo.
         """
-        self.set_up_directories()
+        self.create_clean_workspace()
         self.fetch_repo()
 
-        self.deploy = self.load_deploy()
-
-        self.create_build_virtualenv()
-
-        os.putenv('NAME', self.deploy.name)
-
-    def set_up_directories(self):
+    def create_clean_workspace(self):
         """
         Create the workspace directory if it doesn't exist or clean it out.
-        Create the build directory.
         """
-        if os.path.exists(self.ws_paths.workspace):
+        if os.path.exists(self._dir):
             self.clean_workspace()
         else:
-            os.makedirs(self.ws_paths.workspace)
-
-        os.makedirs(self.ws_paths.build)
+            os.makedirs(self._dir)
 
     def clean_workspace(self):
         """ Clean up the workspace directory (but not the virtualenv). """
-        rmtree_if_exists(self.ws_paths.repo)
-        rmtree_if_exists(self.ws_paths.build)
-        rmtree_if_exists(self.ws_paths.package)
+        for path in self._dirs:
+            rmtree_if_exists(path)
 
     def fetch_repo(self):
         """ Clone the repo and checkout the desired branch. """
-        self._log('Fetching github repo')
-        self._cmd(['git', 'clone', self.repo.url, self.ws_paths.repo])
-        self._cmd(['git', '-C', self.ws_paths.repo, 'checkout',
-                   self.repo.branch])
+        log('Fetching github repo')
+        self._cmd(['git', 'clone', self.repo.url, self._dirs.repo])
+        self._cmd(['git', '-C', self._dirs.repo, 'checkout', self.repo.branch])
 
-    def load_deploy(self):
+    def load_deploy(self, deploy_file='.deploy.yaml'):
         """
         Load the .deploy.yaml file in the repo or fallback to the default
         settings if one could not be found. Merge any overrides.
         """
-        deploy_file_path = os.path.join(self.ws_paths.repo, self.deploy_file)
+        if not os.path.exists(self._dirs.repo):
+            log('WARNING: Repo directory not found. Has it been fetched yet?')
+
+        deploy_file_path = self.get_repo_path(deploy_file)
         if os.path.exists(deploy_file_path):
-            deploy = Deploy.from_deploy_file(deploy_file_path)
+            return Deploy.from_deploy_file(deploy_file_path)
         else:
-            self._log('No deploy file found, continuing with defaults')
-            deploy = Deploy()
+            log('No deploy file found, continuing with defaults')
+            return Deploy()
 
-        # If no name has been specified, use the repo name
-        if not self._overrides.get('name') and not deploy.name:
-            self._overrides['name'] = self.repo.name
+    def make_build_dir(self):
+        """
+        Create the build directory (the workspace directory should already
+        exist).
+        """
+        os.mkdir(self._dirs.build)
 
-        return deploy.override(**self._overrides)
+    def make_package_dir(self):
+        """
+        Create the package directory (the workspace directory should already
+        exist).
+        """
+        os.mkdir(self._dirs.package)
+
+    def make_install_dir(self):
+        """
+        Create the install directory (the package directory should already
+        exist).
+        """
+        os.mkdir(self._dirs.install)
+
+    def get_path(self, *paths):
+        """ Get a path within the workspace directory. """
+        return os.path.join(self._dir, *paths)
+
+    def get_package_path(self, *paths):
+        """ Get a path within the package directory. """
+        return os.path.join(self._dirs.package, *paths)
+
+    def get_build_path(self, *paths):
+        """ Get a path within the build directory. """
+        return os.path.join(self._dirs.build, *paths)
+
+    def get_repo_path(self, *paths):
+        """ Get a path within the repo directory. """
+        return os.path.join(self._dirs.repo, *paths)
+
+    def get_install_path(self, *paths):
+        """ Get a path within the install directory. """
+        return os.path.join(self._dirs.install, *paths)
+
+
+class Build(object):
+
+    debug = False
+
+    def __init__(self, workspace, deploy, deploy_type):
+        """
+        :param: workspace:
+        The workspace to build in.
+
+        :param: deploy:
+        The definition of the deployment as loaded from the project's deploy
+        file.
+
+        :param: deploy_type:
+        The deploy type object describing the type of the deploy.
+        """
+        self.workspace = workspace
+        self.deploy = deploy
+        self.deploy_type = deploy_type
+
+        self.venv_paths = create_venv_paths(workspace.get_path())
+
+    def _cmd(self, args):
+        return cmd(args, debug=self.debug)
+
+    def build(self):
+        """
+        Build the workspace. Gets everything into a state that is ready for
+        packaging.
+        """
+        self.prepare_environment()
+        self.run_buildscript()
+        self.copy_files()
+        self.freeze_virtualenv()
+        self.create_postinstall_script()
+
+    def prepare_environment(self):
+        """
+        Prepare the workspace so that everything is ready to run the
+        buildscript including the virtualenv, build directory, and environment
+        variables.
+        """
+        self.create_build_virtualenv()
+        self.workspace.make_build_dir()
+        self.put_env_variables()
 
     def create_build_virtualenv(self):
         """ Create a virtualenv for the build and install the dependencies. """
-        self._log('Creating virtualenv')
+        log('Creating virtualenv')
 
         # Create clean virtualenv
-        if not os.path.exists(self.build_venv.python):
-            self._cmd(['virtualenv', self.build_venv.venv])
+        if not os.path.exists(self.venv_paths.python):
+            self._cmd(['virtualenv', self.venv_paths.venv])
 
-        self._log('Upgrading pip')
-        self._cmd([self.build_venv.pip, 'install', '--upgrade', 'pip'])
+        log('Upgrading pip')
+        self._cmd([self.venv_paths.pip, 'install', '--upgrade', 'pip'])
 
-        self._log('Installing pip dependencies')
+        log('Installing pip dependencies')
         # Install things
         for dep in self.deploy.pip:
-            self._log('Installing %s' % (dep))
-            self._cmd([self.build_venv.pip, 'install', '--upgrade', dep])
+            log('Installing %s' % (dep))
+            self._cmd([self.venv_paths.pip, 'install', '--upgrade', dep])
 
-    def create_package(self):
-        """ Create the actual package. """
-        self.copy_files()
-        self.create_postinstall_script()
-        self.build_package()
+    def put_env_variables(self):
+        """ Initialises the current working environment. """
+        env = {
+            'VENV': self.venv_paths.venv,
+            'PIP': self.venv_paths.pip,
+            'REPO': self.workspace.repo.name,
+            'BRANCH': self.workspace.repo.branch,
+            'WORKSPACE': self.workspace.get_path(),
+            'BUILDDIR': self.workspace.get_build_path(),
+            'INSTALLDIR': self.workspace.get_install_path(),
+            'NAME': self.deploy.name,
+            'PATH': ':'.join([self.venv_paths.bin, os.getenv('PATH')])
+        }
+        for k, v in env.items():
+            os.putenv(k, v)
 
     def run_buildscript(self):
         """
@@ -178,13 +212,13 @@ class Sideloader(object):
         if not self.deploy.buildscript:
             return
 
-        buildscript_path = os.path.join(self.ws_paths.repo,
-                                        self.deploy.buildscript)
+        buildscript_path = self.workspace.get_repo_path(
+            self.deploy.buildscript)
         self._cmd(['chmod', 'a+x', buildscript_path])
 
         # Push package directory before running build script
         old_cwd = os.getcwd()
-        os.chdir(self.ws_paths.workspace)
+        os.chdir(self.workspace.get_path())
 
         self._cmd([buildscript_path])
 
@@ -193,37 +227,24 @@ class Sideloader(object):
 
     def copy_files(self):
         """ Copy the build and nginx/supervisor config files. """
-        self._log('Preparing package')
-        os.makedirs(self.ws_paths.package)
+        log('Preparing package')
+        self.workspace.make_package_dir()
 
         self.copy_build()
         self.copy_config_files()
 
     def copy_build(self):
         """ Copy build contents to install location. """
-        dest_path = os.path.join(self.ws_paths.package,
-                                 self.config.install_location.lstrip('/'))
-        os.makedirs(dest_path)
+        self.workspace.make_install_dir()
 
-        for directory in os.listdir(self.ws_paths.build):
+        for directory in os.listdir(self.workspace.get_build_path()):
             try:
-                shutil.copytree(os.path.join(self.ws_paths.build, directory),
-                                os.path.join(dest_path, directory))
+                shutil.copytree(self.workspace.get_build_path(directory),
+                                self.workspace.get_install_path(directory))
             except Exception as e:
-                self._log('ERROR: Could not copy %s to package: %s %s' % (
+                log('ERROR: Could not copy %s to package: %s %s' % (
                     directory, type(e), e))
                 self.fail_build('Error copying files to package')
-
-        self.freeze_virtualenv(dest_path)
-
-    def freeze_virtualenv(self, dest_path):
-        """ Freeze post build requirements. """
-        freeze_output = self._cmd([self.build_venv.pip, 'freeze'])
-
-        requirements_path = os.path.join(
-            dest_path, '%s-requirements.pip' % self.deploy.name)
-        with open(requirements_path, 'w') as requirements_file:
-            requirements_file.write(freeze_output)
 
     def copy_config_files(self):
         """
@@ -231,29 +252,38 @@ class Sideloader(object):
         config directory within the package.
         """
         for config_files in self.deploy.config_files:
-            config_dir_path = os.path.join(self.ws_paths.package,
-                                           config_files.config_dir_path)
+            config_dir_path = self.workspace.get_package_path(
+                config_files.config_dir_path)
             os.makedirs(config_dir_path)
 
             for config_file in config_files.files:
-                shutil.copy(os.path.join(self.ws_paths.build, config_file),
+                shutil.copy(self.workspace.get_build_path(config_file),
                             config_dir_path)
+
+    def freeze_virtualenv(self):
+        """ Freeze post build requirements. """
+        freeze_output = self._cmd([self.venv_paths.pip, 'freeze'])
+
+        requirements_path = self.workspace.get_install_path(
+            '%s-requirements.pip' % self.deploy.name)
+        with open(requirements_path, 'w') as requirements_file:
+            requirements_file.write(freeze_output)
 
     def create_postinstall_script(self):
         """ Generate the postinstall script and write it to disk. """
         content = self.generate_postinstall_script()
         if self.debug:
-            self._log(content)
+            log(content)
 
         self.write_postinstall_script(content)
 
     def generate_postinstall_script(self):
         """ Generate the contents of the postinstall script. """
-        self._log('Constructing postinstall script')
+        log('Constructing postinstall script')
 
         # Insert some scripting before the user's script to set up...
         set_up = self.deploy_type.get_set_up_script(
-            self.deploy, self.config.install_location)
+            self.workspace, self.deploy)
 
         # ...and afterwards to tear down.
         tear_down = self.deploy_type.get_tear_down_script()
@@ -277,42 +307,60 @@ NAME={name}
 """.format(
             set_up=set_up,
             tear_down=tear_down,
-            installdir=self.config.install_location,
-            repo=self.repo.name,
-            branch=self.repo.branch,
+            installdir=self.workspace.get_install_path(),
+            repo=self.workspace.repo.name,
+            branch=self.workspace.repo.branch,
             name=self.deploy.name,
             user_postinstall=user_postinstall)
 
     def read_postinstall_file(self):
         """ Read the user's postinstall file. """
-        postinstall_path = os.path.join(self.ws_paths.repo,
-                                        self.deploy.postinstall)
+        postinstall_path = self.workspace.get_repo_path(
+            self.deploy.postinstall)
         with open(postinstall_path) as postinstall_file:
             return postinstall_file.read()
 
     def write_postinstall_script(self, content):
         """ Write the final postinstall script. """
-        postinstall_path = os.path.join(self.ws_paths.workspace,
-                                        'postinstall.sh')
+        postinstall_path = self.workspace.get_path('postinstall.sh')
         with open(postinstall_path, 'w') as postinstall_file:
             postinstall_file.write(content)
         os.chmod(postinstall_path, 0755)
 
-    def build_package(self):
-        """ Run the fpm command that builds the package. """
-        self._log('Building .%s package' % self.build.package_target)
 
-        postinstall_path = os.path.join(self.ws_paths.workspace,
-                                        'postinstall.sh')
+class Package(object):
+
+    debug = False
+    sign = True
+
+    def __init__(self, workspace, deploy, deploy_type, target='deb',
+                 gpg_key=None):
+        self.workspace = workspace
+        self.deploy = deploy
+        self.deploy_type = deploy_type
+        self.target = target
+        self.gpg_key = gpg_key
+
+    def _cmd(self, args):
+        return cmd(args, debug=self.debug)
+
+    def package(self):
+        self.run_fpm()
+        self.sign_debs()
+
+    def run_fpm(self):
+        """ Run the fpm command that builds the package. """
+        log('Building .%s package' % self.target)
+
         fpm = [
             'fpm',
-            '-C', self.ws_paths.package,
-            '-p', self.ws_paths.package,
+            '-C', self.workspace.get_package_path(),
+            '-p', self.workspace.get_package_path(),
             '-s', self.deploy_type.fpm_deploy_type,
-            '-t', self.build.package_target,
+            '-t', self.target,
             '-a', 'amd64',
             '-n', self.deploy.name,
-            '--after-install', postinstall_path,
+            '--after-install', self.workspace.get_path('postinstall.sh'),
         ]
 
         if not self.deploy_type.provides_version:
@@ -321,19 +369,16 @@ NAME={name}
         fpm += sum([['-d', dep] for dep in self.list_all_dependencies()], [])
 
         if self.deploy.user:
-            fpm += ['--%s-user' % self.build.package_target, self.deploy.user]
+            fpm += ['--%s-user' % self.target, self.deploy.user]
 
         if self.debug:
             fpm.append('--debug')
 
-        fpm += self.deploy_type.get_fpm_args(self.ws_paths)
+        fpm += self.deploy_type.get_fpm_args(self.workspace._dirs)
 
         self._cmd(fpm)
 
-        if self.build.package_target == 'deb' and self.sign:
-            self.sign_debs()
-
-        self._log('Build completed successfully')
+        log('Build completed successfully')
 
     def list_all_dependencies(self):
         """ Get a list of all the package dependencies. """
@@ -352,17 +397,87 @@ NAME={name}
 
     def sign_debs(self):
         """ Sign the .deb file with the configured gpg key. """
-        if not self.config.gpg_key:
-            self._log('No GPG key configured, skipping signing')
-        self._log('Signing package')
+        if self.gpg_key is None:
+            log('No GPG key configured, skipping signing')
+        log('Signing package')
         # Find all the .debs in the directory and indiscriminately sign them
         # (there should only be 1)
         # TODO: Get the actual package name from fpm
-        debs = [path for path in listdir_abs(self.ws_paths.package)
+        debs = [path for path in listdir_abs(self.workspace.get_package_path())
                 if os.path.splitext(path)[1] == '.deb']
         for deb in debs:
-            self._cmd(['dpkg-sig', '-k', self.config.gpg_key, '--sign',
-                       'builder', deb])
+            self._cmd(
+                ['dpkg-sig', '-k', self.gpg_key, '--sign', 'builder', deb])
+
+
+class Sideloader(object):
+
+    def __init__(self, config_path, github_url, branch=None, workspace_id=None,
+                 debug=False):
+        self.config = Config.from_config_file(config_path)
+        self.repo = self._create_git_repo(github_url, branch)
+        self.workspace_id = (workspace_id if workspace_id is not None
+                             else self.repo.name)
+        self.debug = debug
+
+    def _create_git_repo(self, github_url, branch):
+        branch = branch if branch is not None else self.config.default_branch
+        return GitRepo.from_github_url(github_url, branch)
+
+    def run(self, deploy_file='.deploy.yaml', dtype='virtualenv', target='deb',
+            build_num=None, sign=True, **deploy_overrides):
+        workspace = self._create_workspace()
+        workspace.set_up()
+
+        deploy = self._load_deploy(workspace, deploy_file, build_num,
+                                   **deploy_overrides)
+        deploy_type = self._get_deploy_type(dtype)
+
+        build = self._create_build(workspace, deploy, deploy_type)
+        build.build()
+
+        package = self._create_package(workspace, deploy, deploy_type, target,
+                                       sign)
+        package.package()
+
+    def _create_workspace(self):
+        workspace = Workspace(self.workspace_id, self.config.workspace_base,
+                              self.config.install_location, self.repo)
+        workspace.debug = self.debug
+        return workspace
+
+    def _load_deploy(self, workspace, deploy_file, build_num,
+                     **deploy_overrides):
+        if 'version' not in deploy_overrides:
+            if build_num is None:
+                build_num = 1
+            deploy_overrides['version'] = '0.%s' % build_num
+
+        deploy = workspace.load_deploy(deploy_file)
+        deploy = deploy.override(**deploy_overrides)
+        return deploy
+
+    def _get_deploy_type(self, deploy_type_str):
+        if deploy_type_str == 'python':
+            return deploy_types.Python()
+        elif deploy_type_str == 'virtualenv':
+            return deploy_types.VirtualEnv()
+
+        return deploy_types.DeployType()
+
+    def _create_build(self, workspace, deploy, deploy_type):
+        build = Build(workspace, deploy, deploy_type)
+        build.debug = self.debug
+
+        return build
+
+    def _create_package(self, workspace, deploy, deploy_type, target, sign):
+        package = Package(workspace, deploy, deploy_type, target,
+                          self.config.gpg_key)
+        package.sign = sign
+        package.debug = self.debug
+
+        return package
 
 
 class Config(object):
@@ -469,10 +584,3 @@ class Deploy(object):
                     kwargs[attr] = value
 
         return Deploy(**kwargs)
-
-
-class Build(object):
-    """ Container class for the build settings. """
-    def __init__(self, workspace_id, package_target):
-        self.workspace_id = workspace_id
-        self.package_target = package_target
