@@ -199,7 +199,7 @@ class Build(object):
             'PATH': ':'.join([self.venv_paths.bin, os.getenv('PATH')])
         }
         for k, v in env.items():
-            os.putenv(k, v)
+            os.environ[k] = v
 
     def run_buildscript(self):
         """
