@@ -18,6 +18,7 @@ class Workspace(object):
     """
 
     debug = False
+    _cmd = lambda self, *args, **kwargs: cmd(*args, debug=self.debug, **kwargs)
 
     def __init__(self, workspace_id, workspace_base, install_location, repo):
         self.install_location = install_location
@@ -38,9 +39,6 @@ class Workspace(object):
                                     install_location.lstrip('/'))
         }
         self._dirs = namedtuple('WorkspaceDirs', dirs.keys())(**dirs)
-
-    def _cmd(self, args):
-        return cmd(args, debug=self.debug)
 
     def set_up(self):
         """
@@ -129,6 +127,7 @@ class Workspace(object):
 class Build(object):
 
     debug = False
+    _cmd = lambda self, *args, **kwargs: cmd(*args, debug=self.debug, **kwargs)
 
     def __init__(self, workspace, deploy, deploy_type):
         """
@@ -147,9 +146,6 @@ class Build(object):
         self.deploy_type = deploy_type
 
         self.venv_paths = create_venv_paths(workspace.get_path())
-
-    def _cmd(self, args):
-        return cmd(args, debug=self.debug)
 
     def build(self):
         """
@@ -332,6 +328,7 @@ class Package(object):
 
     debug = False
     sign = True
+    _cmd = lambda self, *args, **kwargs: cmd(*args, debug=self.debug, **kwargs)
 
     def __init__(self, workspace, deploy, deploy_type, target='deb',
                  gpg_key=None):
@@ -340,9 +337,6 @@ class Package(object):
         self.deploy_type = deploy_type
         self.target = target
         self.gpg_key = gpg_key
-
-    def _cmd(self, args):
-        return cmd(args, debug=self.debug)
 
     def package(self):
         self.run_fpm()
