@@ -18,6 +18,9 @@ setup(name='sideloader',
           'click',
           'PyYAML',
       ],
+      tests_require=[
+          'pytest',
+      ],
       entry_points={
           'console_scripts': ['sideloader = sideloader.cli:main'],
       })

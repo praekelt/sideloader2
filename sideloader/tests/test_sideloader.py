@@ -1,11 +1,19 @@
 import os
 
+import pytest
+
 from sideloader import Build, Deploy, GitRepo, Workspace
 from sideloader.deploy_types import DeployType
 
 
 class TestGitRepo(object):
-    pass
+    def test_from_github_url(self):
+        repo = GitRepo.from_github_url(
+            'https://github.com/praekelt/sideloader2.git', 'develop')
+
+        assert repo.url == 'https://github.com/praekelt/sideloader2.git'
+        assert repo.name == 'sideloader2'
+        assert repo.branch == 'develop'
 
 
 class CommandLineTest(object):
@@ -84,8 +92,48 @@ class TestWorkspace(CommandLineTest):
              'checkout', 'develop']
         )
 
+
 class TestDeploy(object):
-    pass
+    def setup_method(self, test_method):
+        self.deploy = Deploy(
+            name='test', buildscript='scripts/build.sh',
+            postinstall='scripts/postinst.sh', config_files=[],
+            pip=['requests'], dependencies=['g++'], virtualenv_prefix='test',
+            allow_broken_build=False, user='ubuntu', version='1.0')
+
+    def test_override(self):
+        """
+        When a Deploy is overridden, a new Deploy object is returned with the
+        overridden fields set with the new values while the other fields
+        remain the same.
+        """
+        overridden = self.deploy.override(name='name',
+                                          pip=['django', 'pytest'])
+
+        # Check that the new values are present
+        assert overridden.name == 'name'
+        assert overridden.pip == ['django', 'pytest']
+
+        # Check that the old values for the other fields remain
+        assert overridden.buildscript == 'scripts/build.sh'
+        assert overridden.postinstall == 'scripts/postinst.sh'
+        assert overridden.config_files == []
+        assert overridden.dependencies == ['g++']
+        assert overridden.virtualenv_prefix == 'test'
+        assert not overridden.allow_broken_build
+        assert overridden.user == 'ubuntu'
+        assert overridden.version == '1.0'
+
+    def test_override_unknown_attribute_fails(self):
+        """
+        Overriding fields that don't exist in the deploy should throw an
+        exception.
+        """
+        with pytest.raises(AttributeError) as error:
+            self.deploy.override(blah='blah')
+
+        assert (error.value.message ==
+                '\'Deploy\' object has no attribute \'blah\'')
 
 
 class TestBuild(CommandLineTest):
