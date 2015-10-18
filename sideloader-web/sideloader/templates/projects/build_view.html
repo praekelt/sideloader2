@@ -1,0 +1,47 @@
+{% extends "fragments/default.html" %}
+{% block navbar %}
+{% include "fragments/navbar.html" %}
+{% endblock %}
+
+{% block content %}
+
+{% if build %}
+    <div class="col-lg-9">
+        <h4>Build log</h4>
+        <p>
+            <strong>Name:</strong> <a href="{% url 'projects_view' id=build.project.id %}">{{ build.project.name }}</a>
+        </p>
+    </div>
+{% endif %}
+
+<div class="col-lg-9">
+    <p>
+        {% if build %}
+        <pre id="log" class="logview"></pre>
+        {% else %}
+        Not authorized
+        {% endif %}
+    </p>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+    $(function () {
+        function updateBuildLog(){
+            $.getJSON("{% url 'build_output' id=build.id %}", function( data ) {
+                var log = $("#log");
+                
+                log.text(data.log);
+                log.scrollTop(log[0].scrollHeight);
+
+                if (parseInt(data.state) < 1) {
+                    setTimeout(updateBuildLog, 500);
+                }
+            });
+        }
+
+        updateBuildLog();
+    });
+</script>
+{% endblock %}

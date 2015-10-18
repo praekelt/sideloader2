@@ -1,6 +1,7 @@
 import time
 import json
 import traceback
+import yaml
 
 from twisted.application import service
 from twisted.internet import task, reactor, protocol, defer
@@ -14,7 +15,14 @@ class HiveService(service.Service):
     Runs timers, configures sources and and manages the queue
     """
     def __init__(self, config):
-        self.config = config
+        try:
+            self.config = yaml.load(open(config))
+        except:
+            self.config = {}
+
+        self.redis_host = self.config.get('redis_host', 'localhost')
+        self.redis_port = int(self.config.get('redis_port', 6379))
+
 
     @defer.inlineCallbacks
     def grabQueue(self, queue=0):
@@ -35,6 +43,8 @@ class HiveService(service.Service):
     @defer.inlineCallbacks
     def queueRun(self):
         item = yield self.grabQueue()
+
+        print item
 
         if item:
             m = item.get('message')

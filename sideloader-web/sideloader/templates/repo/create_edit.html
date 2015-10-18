@@ -1,0 +1,15 @@
+{% extends "fragments/default.html" %}
+{% load crispy_forms_tags %}
+{% block navbar %}
+{% include "fragments/navbar.html" %}
+{% endblock %}
+
+{% block content %}
+<div class="col-lg-9">
+    <h4 style="margin-bottom:10px">{% if repo %}Edit Repo{% else %}Add Repo{% endif %}</h4>
+    {% crispy form %}
+</div>
+{% endblock %}
+
+{% block script %}
+{% endblock %}
