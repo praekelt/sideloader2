@@ -30,6 +30,11 @@ class ProjectForm(BaseModelForm):
         model = models.Project
         exclude = ()
 
+class PackageRepoForm(BaseModelForm):
+    class Meta:
+        model = models.PackageRepo
+        exclude = ()
+
 class RepoForm(BaseModelForm):
     github_url = forms.CharField(label="Git checkout URL")
 

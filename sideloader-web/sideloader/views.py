@@ -91,14 +91,41 @@ def manage_index(request):
     if not request.user.is_superuser:
         return redirect('home')
 
-    users = User.objects.all()
-    print dir(users[0])
+    users = User.objects.all().order_by('username')
+    repos = models.PackageRepo.objects.all().order_by('name')
 
     return render(request, "manage/index.html", {
         'projects': getProjects(request),
-        'users': users
+        'users': users,
+        'repos': repos
     })
-        
+
+@login_required
+def manage_create_repo(request):
+    if not request.user.is_superuser:
+        return redirect('home')
+
+    if request.method == "POST":
+        form = forms.PackageRepoForm(request.POST)
+        if form.is_valid():
+            release = form.save(commit=False)
+            release.save()
+
+            return redirect('manage_index')
+    else:
+        form = forms.PackageRepoForm()
+
+    return render(request, "manage/create_repo.html", {
+        'form': form,
+        'projects': getProjects(request),
+    })
+
+@login_required
+def manage_delete_repo(request, id):
+    repo = models.PackageRepo.objects.get(id=id)
+    repo.delete()
+
+    return redirect('manage_index')
 
 @login_required
 def server_index(request):

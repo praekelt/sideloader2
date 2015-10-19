@@ -29,6 +29,7 @@ Not Authorized
   <ul class="nav nav-tabs" role="tablist" id="projectTabs">
     <li role="presentation" class="active"><a href="#repos" aria-controls="repos" role="tab" data-toggle="tab">Repos</a></li>
     <li role="presentation"><a href="#streams" aria-controls="streams" role="tab" data-toggle="tab">Streams</a></li>
+    <li role="presentation"><a href="#targets" aria-controls="targets" role="tab" data-toggle="tab">Targets</a></li>
     <li role="presentation"><a href="#releases" aria-controls="releases" role="tab" data-toggle="tab">Releases</a></li>
     <li role="presentation"><a href="#builds" aria-controls="builds" role="tab" data-toggle="tab">Builds</a></li>
   </ul>
@@ -68,6 +69,8 @@ Not Authorized
         <a href="{% url 'repo_create' project=project.id %}" class="btn btn-default">Add</a>
       </p>
       {% endif %}
+    </div>
+    <div role="tabpanel" class="tab-pane" id="targets">
     </div>
     <div role="tabpanel" class="tab-pane" id="streams">
       <br/>

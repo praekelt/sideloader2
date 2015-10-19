@@ -8,6 +8,12 @@ class Project(models.Model):
     name = models.CharField(max_length=255, unique=True)
     allowed_users = models.ManyToManyField(settings.AUTH_USER_MODEL, blank=True)
 
+    def __unicode__(self):
+        return self.name
+
+    def __str__(self):
+        return self.__unicode__().encode('utf-8', 'replace')
+
 class Repo(models.Model):
     github_url = models.CharField(max_length=255)
 
@@ -78,6 +84,10 @@ class Server(models.Model):
 class PackageRepo(models.Model):
     name = models.CharField(max_length=255)
     cmd = models.TextField()
+
+    project = models.ForeignKey(Project, blank=True, null=True)
+
+    created_by_user = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="PackageRepoCreatedBy")
 
 class Stream(models.Model):
     name = models.CharField(max_length=255)
@@ -152,6 +162,8 @@ class Target(models.Model):
     description = models.CharField(max_length=256)
 
     stream_mode = models.CharField(max_length=64, default='repo')
+
+    custom_script = models.TextField(blank=True)
 
     package_repo = models.ForeignKey(PackageRepo, blank=True)
 

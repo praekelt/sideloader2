@@ -60,6 +60,8 @@ urlpatterns = patterns('',
 
     # Admin
     url(r'^manage/$', 'sideloader.views.manage_index', name='manage_index'),
+    url(r'^manage/repo/create$', 'sideloader.views.manage_create_repo', name='manage_create_repo'),
+    url(r'^manage/repo/delete/(?P<id>[\d+])$', 'sideloader.views.manage_delete_repo', name='manage_delete_repo'),
 
     # API
     url(r'^api/build/(?P<hash>[\w-]+)$', 'sideloader.views.api_build', name='api_build'),
