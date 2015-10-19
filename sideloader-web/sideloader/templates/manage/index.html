@@ -17,6 +17,32 @@
   <div class="tab-content">
     <!-- Tabs -->
     <div role="tabpanel" class="tab-pane" id="repos">
+      <br/>
+      <table class="table table-hover table-bordered table-condensed">
+        <tbody>
+          <thead><tr>
+            <th>Name</th>
+            <th>Owner</th>
+            <th>Project</th>
+            <th></th>
+          </tr></thead>
+          {% for repo in repos %}
+            <tr>
+              <td>{{ repo.name }}</td>
+              <td>{{ repo.owner }}</td>
+              <td>{{ repo.project }}</td>
+              <td width="90em">
+                <div class="btn-group btn-group-sm">
+                  <a class="btn btn-default" href="#" title="Edit"><span class="glyphicon glyphicon-edit electric"></span></a>
+                  <a class="btn btn-default" href="{% url 'manage_delete_repo' id=repo.id %}" title="Delete"><span class="glyphicon glyphicon-remove electric"></span></a>
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <br/>
+      <a href="{% url 'manage_create_repo' %}" class="btn btn-default">Add package repo</a>
     </div>
     <div role="tabpanel" class="tab-pane" id="servers">
     </div>
@@ -56,6 +82,9 @@
 {% block script %}
 <script>
   $('#projectTabs a').click(function (e) {
+    var control = $(this)[0].attributes[1].value;
+    console.log($.cookie);
+    console.log(control);
     e.preventDefault()
     $(this).tab('show')
   })
