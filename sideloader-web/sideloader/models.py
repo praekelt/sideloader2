@@ -40,6 +40,12 @@ class Repo(models.Model):
     notifications = models.BooleanField(default=True)
     slack_channel = models.CharField(max_length=255, default='', blank=True)
 
+    def __unicode__(self):
+        return self.github_url
+
+    def __str__(self):
+        return self.__unicode__().encode('utf-8', 'replace')
+
 class Server(models.Model):
     name = models.CharField(max_length=255)
     last_checkin = models.DateTimeField(auto_now_add=True)
@@ -82,14 +88,11 @@ class Stream(models.Model):
     post_build = models.TextField(blank=True)
 
     branch = models.CharField(max_length=256, default='develop')
+    architecture = models.CharField(max_length=64, default='amd64')
 
     require_signoff = models.BooleanField(default=False)
     signoff_list = models.TextField(blank=True)
     quorum = models.IntegerField(default=0)
-
-    service_restart = models.BooleanField(default=True)
-    service_pre_stop = models.BooleanField(default=False)
-    puppet_run = models.BooleanField(default=True)
 
     auto_release = models.BooleanField(default=False)
 

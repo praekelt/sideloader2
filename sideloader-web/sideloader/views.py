@@ -7,6 +7,7 @@ import yaml
 
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import User
 from django.views.decorators.csrf import csrf_exempt
 from django.core.urlresolvers import reverse
 from django.http import HttpResponse
@@ -69,7 +70,6 @@ def index(request):
 
 @login_required
 def accounts_profile(request):
-    projects = getProjects(request)
     if request.method == "POST":
         form = forms.UserForm(request.POST, instance=request.user)
 
@@ -83,8 +83,22 @@ def accounts_profile(request):
 
     return render(request, "accounts_profile.html", {
         'form': form,
-        'projects': projects
+        'projects': getProjects(request)
     })
+
+@login_required
+def manage_index(request):
+    if not request.user.is_superuser:
+        return redirect('home')
+
+    users = User.objects.all()
+    print dir(users[0])
+
+    return render(request, "manage/index.html", {
+        'projects': getProjects(request),
+        'users': users
+    })
+        
 
 @login_required
 def server_index(request):
@@ -340,6 +354,7 @@ def stream_create(request, project):
             return redirect('projects_view', id=project)
     else:
         form = forms.StreamForm()
+        form.fields['repo'].queryset = p.repo_set.all().order_by('github_url')
 
     return render(request, 'stream/create_edit.html', {
         'form': form,
@@ -374,17 +389,18 @@ def stream_edit(request, id):
                     print "Deleting old target", target
                     target.delete()
 
-            return redirect('projects_view', id=stream.project.id)
+            return redirect('projects_view', id=stream.repo.project.id)
 
     else:
         form = forms.StreamForm(instance=stream)
         form.initial['targets'] = [t.server for t in stream.target_set.all()]
+
         
 
     return render(request, 'stream/create_edit.html', {
         'form': form, 
         'stream': stream,
-        'project': stream.project,
+        'project': stream.repo.project,
         'projects': getProjects(request)
     })
 

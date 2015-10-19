@@ -1,0 +1,63 @@
+{% extends "fragments/default.html" %}
+{% block navbar %}
+{% include "fragments/navbar.html" %}
+{% endblock %}
+
+{% block content %}
+
+<div class="col-lg-9">
+  <h4>Sideloader admin</h4>
+  <br/>
+  <ul class="nav nav-tabs" role="tablist" id="projectTabs">
+    <li role="presentation" class="active"><a href="#users" aria-controls="users" role="tab" data-toggle="tab">Users</a></li>
+    <li role="presentation"><a href="#repos" aria-controls="repos" role="tab" data-toggle="tab">Distribution Repos</a></li>
+    <li role="presentation"><a href="#servers" aria-controls="servers" role="tab" data-toggle="tab">Servers</a></li>
+  </ul>
+
+  <div class="tab-content">
+    <!-- Tabs -->
+    <div role="tabpanel" class="tab-pane" id="repos">
+    </div>
+    <div role="tabpanel" class="tab-pane" id="servers">
+    </div>
+    <div role="tabpanel" class="tab-pane active" id="users">
+      <br/>
+      <table class="table table-hover table-bordered table-condensed">
+        <tbody>
+          <thead><tr>
+            <th>Username</th>
+            <th>Email address</th>
+            <th>Is Admin</th>
+            <th>Last login</th>
+            <th></th>
+          </tr></thead>
+          {% for user in users %}
+            <tr>
+              <td>{{ user.username }}</td>
+              <td>{{ user.email }}</td>
+              <td>{{ user.is_superuser }}</td>
+              <td>{{ user.last_login }}</td>
+              <td width="90em">
+                <div class="btn-group btn-group-sm">
+                  <a class="btn btn-default" href="#" title="Edit"><span class="glyphicon glyphicon-edit electric"></span></a>
+                  <a class="btn btn-default" href="#" title="Delete"><span class="glyphicon glyphicon-remove electric"></span></a>
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <!-- End tabs -->
+  </div>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+  $('#projectTabs a').click(function (e) {
+    e.preventDefault()
+    $(this).tab('show')
+  })
+</script>
+{% endblock %}

@@ -76,13 +76,34 @@ class StreamForm(BaseModelForm):
         label='Package type',
         widget=forms.Select,
         choices=(
-            ('deb', 'Debian'),
+            ('deb', 'Debian/Ubuntu'),
             ('rpm', 'RedHat'),
             ('docker', 'Docker image'),
             ('dockerhub', 'Docker Hub'),
-            ('tar', 'TAR file')
+            ('tar', 'TAR file'),
+            ('pypi', 'PyPi Upload')
         )
     )
+
+    architecture = forms.ChoiceField(
+        label='CPU architecture',
+        widget=forms.Select,
+        choices=(
+            ('amd64', 'amd64'),
+            ('i386', 'i386'),
+        )
+    )
+
+    targets = forms.ModelMultipleChoiceField(
+        queryset=models.Server.objects.all().order_by('name'),
+        required=False
+    )
+
+    targets.help_text = ''
+
+    auto_release = forms.BooleanField(
+        help_text="Automatically deploy new builds to this release workflow",
+        required=False)
 
     require_signoff = forms.BooleanField(
         label="Require sign-off",
@@ -94,25 +115,24 @@ class StreamForm(BaseModelForm):
         required=False,
         help_text="List email addresses on a new line")
 
-    auto_release = forms.BooleanField(
-        help_text="Automatically deploy new builds to this release workflow",
-        required=False)
-
     quorum = forms.IntegerField(
         required=False,
         initial=0,
         help_text="Required number of sign-offs before release. 0 means <strong>all</strong> are required")
     
-    targets = forms.ModelMultipleChoiceField(
-        queryset=models.Server.objects.all().order_by('name'),
-        required=False
-    )
-
-    targets.help_text = ''
+    notify = forms.BooleanField(
+        label="Notify",
+        help_text="Send notifications of releases by email",
+        required=False)
 
     class Meta:
         model = models.Stream
         exclude = ('project',)
+        fields = (
+            'name', 'repo', 'branch', 'package_type', 'architecture',
+            'post_build', 'targets', 'auto_release', 'require_signoff',
+            'signoff_list', 'notify', 'notify_list',
+        )
 
 #class ModuleForm(BaseModelForm):
 #    class Meta:

@@ -58,6 +58,9 @@ urlpatterns = patterns('',
     # Help
     url(r'^help/$', 'sideloader.views.help_index', name='help_index'),
 
+    # Admin
+    url(r'^manage/$', 'sideloader.views.manage_index', name='manage_index'),
+
     # API
     url(r'^api/build/(?P<hash>[\w-]+)$', 'sideloader.views.api_build', name='api_build'),
     url(r'^api/rap/(?P<hash>[\w-]+)$', 'sideloader.views.api_sign', name='api_sign'),
