@@ -8,7 +8,7 @@
 <div class="col-lg-9">
   <h4>Sideloader admin</h4>
   <br/>
-  <ul class="nav nav-tabs" role="tablist" id="projectTabs">
+  <ul class="nav nav-tabs" role="tablist" id="manageTabs">
     <li role="presentation" class="active"><a href="#users" aria-controls="users" role="tab" data-toggle="tab">Users</a></li>
     <li role="presentation"><a href="#repos" aria-controls="repos" role="tab" data-toggle="tab">Distribution Repos</a></li>
     <li role="presentation"><a href="#servers" aria-controls="servers" role="tab" data-toggle="tab">Servers</a></li>
@@ -81,12 +81,17 @@
 
 {% block script %}
 <script>
-  $('#projectTabs a').click(function (e) {
+  $('#manageTabs a').click(function (e) {
     var control = $(this)[0].attributes[1].value;
-    console.log($.cookie);
-    console.log(control);
+    $.cookie('mantab', control);
     e.preventDefault()
     $(this).tab('show')
   })
+
+  var lastTab = $.cookie('mantab');
+  if (lastTab) {
+    tab = $("[aria-controls='" + lastTab + "']");
+    tab.click();
+  }
 </script>
 {% endblock %}
