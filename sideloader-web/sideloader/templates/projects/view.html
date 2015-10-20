@@ -38,8 +38,8 @@ Not Authorized
     <!-- Tabs -->
     <div role="tabpanel" class="tab-pane active" id="repos">
       <br/>
-      {% if repos %}
       <p>
+      {% if repos %}
         <table class="table table-hover table-bordered table-condensed">
           <thead><tr>
             <th>Github URL</th>
@@ -55,7 +55,7 @@ Not Authorized
                 <td >{{ repo.build_type }}</td>
                 <td >{{ repo.default_branch }}</td>
                 <td >{{ repo.build_counter }}</td>
-                <td width="110em">
+                <td width="120em">
                   <div class="btn-group btn-group-sm">
                     <a href="{% url 'projects_build' id=repo.id %}" class="btn btn-primary" title="Build"><span class="glyphicon glyphicon-play electric"></span></a>
                     <a class="btn btn-default" href="{% url 'repo_edit' id=repo.id %}" title="Edit"><span class="glyphicon glyphicon-edit electric"></span></a>
@@ -66,9 +66,9 @@ Not Authorized
             {% endfor %}
           </tbody>
         </table>
+      {% endif %}
         <a href="{% url 'repo_create' project=project.id %}" class="btn btn-default">Add</a>
       </p>
-      {% endif %}
     </div>
     <div role="tabpanel" class="tab-pane" id="targets">
     </div>
