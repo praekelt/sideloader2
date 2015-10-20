@@ -2,6 +2,7 @@ import time
 import json
 import traceback
 import yaml
+import socket
 
 from twisted.application import service
 from twisted.internet import task, reactor, protocol, defer
@@ -19,6 +20,8 @@ class HiveService(service.Service):
             self.config = yaml.load(open(config))
         except:
             self.config = {}
+
+        self.hostname = socket.gethostbyaddr(socket.gethostname())[0]
 
         self.redis_host = self.config.get('redis_host', 'localhost')
         self.redis_port = int(self.config.get('redis_port', 6379))
@@ -40,16 +43,26 @@ class HiveService(service.Service):
     def processItem(self, item):
         pass
 
+    def heartbeat(self):
+        return self.client.set(
+            "hive.server.%s.heartbeat" % self.hostname, time.time(), expire=3600)
+
+    def setStatus(self, status):
+        return self.client.set(
+            "hive.server.%s.status" % self.hostname, status, expire=3600)
+
     @defer.inlineCallbacks
     def queueRun(self):
         item = yield self.grabQueue()
-
-        print item
+        
+        yield self.heartbeat()
 
         if item:
             m = item.get('message')
             if m:
                 id = item['id']
+                yield self.setStatus("processing:%s:%s:%s" % (
+                    m, id, time.time()))
                 try:
                     result = yield self.processItem(item)
 
@@ -68,6 +81,8 @@ class HiveService(service.Service):
             reactor.callLater(0.01, self.queueRun)
         else:
             reactor.callLater(1.0, self.queueRun)
+
+        yield self.setStatus("ready")
 
         defer.returnValue(None)
 

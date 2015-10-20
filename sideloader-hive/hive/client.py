@@ -1,4 +1,5 @@
 import redis
+import time
 import json
 import uuid
 
@@ -37,3 +38,29 @@ class HiveClient(object):
             self._get_client().get('hive.r.%s' % id)
         )
 
+    def clusterStatus(self):
+        """
+        Returns a dict of cluster nodes and their status information
+        """
+        c = self._get_client()
+        servers = c.keys('hive.server.*.heartbeat')
+        
+        d = {}
+
+        now = time.time()
+
+        for s in servers:
+            sname = s.split('.', 2)[-1].rsplit('.', 1)[0]
+
+            last = float(c.get('hive.server.%s.heartbeat' % sname))
+            status = c.get('hive.server.%s.status' % sname)
+
+            if (status == 'ready') and (now - last > 5):
+                status = 'offline'
+
+            d[sname] = {
+                'lastseen': last,
+                'status': status
+            }
+
+        return d

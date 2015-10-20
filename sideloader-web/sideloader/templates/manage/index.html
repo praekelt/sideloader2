@@ -12,6 +12,7 @@
     <li role="presentation" class="active"><a href="#users" aria-controls="users" role="tab" data-toggle="tab">Users</a></li>
     <li role="presentation"><a href="#repos" aria-controls="repos" role="tab" data-toggle="tab">Distribution Repos</a></li>
     <li role="presentation"><a href="#servers" aria-controls="servers" role="tab" data-toggle="tab">Servers</a></li>
+    <li role="presentation"><a href="#hive" aria-controls="hive" role="tab" data-toggle="tab">Hive</a></li>
   </ul>
 
   <div class="tab-content">
@@ -44,8 +45,6 @@
       <br/>
       <a href="{% url 'manage_create_repo' %}" class="btn btn-default">Add package repo</a>
     </div>
-    <div role="tabpanel" class="tab-pane" id="servers">
-    </div>
     <div role="tabpanel" class="tab-pane active" id="users">
       <br/>
       <table class="table table-hover table-bordered table-condensed">
@@ -66,6 +65,34 @@
               <td width="90em">
                 <div class="btn-group btn-group-sm">
                   <a class="btn btn-default" href="#" title="Edit"><span class="glyphicon glyphicon-edit electric"></span></a>
+                  <a class="btn btn-default" href="#" title="Delete"><span class="glyphicon glyphicon-remove electric"></span></a>
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div role="tabpanel" class="tab-pane" id="servers">
+    </div>
+
+    <div role="tabpanel" class="tab-pane" id="hive">
+      <br/>
+      <table class="table table-hover table-bordered table-condensed">
+        <tbody>
+          <thead><tr>
+            <th>Hostname</th>
+            <th>Last seen</th>
+            <th>Status</th>
+            <th></th>
+          </tr></thead>
+          {% for hive in hives %}
+            <tr>
+              <td>{{ hive.hostname }}</td>
+              <td>{{ hive.lastseen }}</td>
+              <td>{{ hive.status }}</td>
+              <td width="50em">
+                <div class="btn-group btn-group-sm">
                   <a class="btn btn-default" href="#" title="Delete"><span class="glyphicon glyphicon-remove electric"></span></a>
                 </div>
               </td>

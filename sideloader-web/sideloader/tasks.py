@@ -6,3 +6,6 @@ def build(build):
     print build
 
     return c.queue('build', {})
+
+def getClusterStatus():
+    return HiveClient().clusterStatus()

@@ -3,6 +3,7 @@ import uuid
 import urlparse
 import json
 import hashlib, hmac, base64
+import time
 import yaml
 
 from django.shortcuts import render, redirect
@@ -94,10 +95,20 @@ def manage_index(request):
     users = User.objects.all().order_by('username')
     repos = models.PackageRepo.objects.all().order_by('name')
 
+    hives = []
+    for k, v in tasks.getClusterStatus().items():
+        v['hostname'] = k
+        hives.append({
+            'hostname': k,
+            'lastseen': time.ctime(v['lastseen']),
+            'status': v['status']
+        })
+
     return render(request, "manage/index.html", {
         'projects': getProjects(request),
         'users': users,
-        'repos': repos
+        'repos': repos,
+        'hives': hives
     })
 
 @login_required
