@@ -129,11 +129,11 @@ class TestDeploy(object):
         Overriding fields that don't exist in the deploy should throw an
         exception.
         """
-        with pytest.raises(AttributeError) as error:
+        with pytest.raises(ValueError) as error:
             self.deploy.override(blah='blah')
 
         assert (error.value.message ==
-                '\'Deploy\' object has no attribute \'blah\'')
+                'Deploy has no attribute \'blah\'')
 
 
 class TestBuild(CommandLineTest):

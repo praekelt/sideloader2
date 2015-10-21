@@ -569,6 +569,9 @@ class Deploy(object):
         attrs = ['name', 'buildscript', 'postinstall', 'config_files', 'pip',
                  'dependencies', 'virtualenv_prefix', 'allow_broken_build',
                  'user', 'version']
+        for override in overrides.keys():
+            if override not in attrs:
+                raise ValueError('Deploy has no attribute \'%s\'' % override)
         kwargs = {}
         for attr in attrs:
             kwargs[attr] = getattr(self, attr)
