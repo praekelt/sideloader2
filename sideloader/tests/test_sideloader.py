@@ -400,6 +400,39 @@ class TestBuild(CommandLineTest):
         assert package_path.join('etc', 'supervisor', 'conf.d',
                                  'my-app.conf').check()
 
+    def test_generate_postinstall(self, tmpdir):
+        """
+        When the postinstall script is generated, its content is correct.
+        """
+        build = self._create_build(tmpdir)
+
+        # Set up a fake postinstall script
+        script = """lorem ipsum
+this is a test"""
+        postinstall_path = tmpdir.ensure(
+            'test_id', 'sideloader2', 'sideloader', dir=True).join(
+                'postinstall.sh')
+        postinstall_path.write(script)
+
+        build.deploy = build.deploy.override(postinstall=str(postinstall_path))
+
+        postinstall_script = build.generate_postinstall_script()
+        print(postinstall_script)
+        assert postinstall_script == """#!/bin/bash
+
+
+
+INSTALLDIR={tmpdir}/test_id/package/opt
+REPO=sideloader2
+BRANCH=develop
+NAME=test_deploy
+
+lorem ipsum
+this is a test
+
+
+""".format(tmpdir=str(tmpdir))
+
 
 class TestPackage(CommandLineTest):
 
