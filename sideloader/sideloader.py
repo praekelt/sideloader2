@@ -240,13 +240,8 @@ class Build(object):
         self.workspace.make_install_dir()
 
         for directory in os.listdir(self.workspace.get_build_path()):
-            try:
-                shutil.copytree(self.workspace.get_build_path(directory),
-                                self.workspace.get_install_path(directory))
-            except Exception as e:
-                log('ERROR: Could not copy %s to package: %s %s' % (
-                    directory, type(e), e))
-                self.fail_build('Error copying files to package')
+            shutil.copytree(self.workspace.get_build_path(directory),
+                            self.workspace.get_install_path(directory))
 
     def copy_config_files(self):
         """
