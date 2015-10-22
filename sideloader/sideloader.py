@@ -101,7 +101,13 @@ class Workspace(object):
         Create the install directory (the package directory should already
         exist).
         """
-        os.mkdir(self._dirs.install)
+        package_relpath = os.path.relpath(self._dirs.install,
+                                          self._dirs.package)
+        parts = package_relpath.split(os.sep)
+        subpath = self._dirs.package
+        for part in parts:
+            subpath = os.path.join(subpath, part)
+            os.mkdir(subpath)
 
     def get_path(self, *paths):
         """ Get a path within the workspace directory. """
