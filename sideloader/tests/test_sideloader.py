@@ -250,7 +250,8 @@ class TestBuild(CommandLineTest):
                        'develop', 'sideloader2')
 
         workspace = Workspace('test_id', str(tmpdir), '/opt', repo)
-        deploy = Deploy(name='test_deploy', pip=['django', 'pytest'])
+        deploy = Deploy(name='test_deploy', pip=['django', 'pytest'],
+                        buildscript='sideloader/build.sh')
         deploy_type = DeployType()
 
         build = Build(workspace, deploy, deploy_type)
@@ -320,6 +321,32 @@ class TestBuild(CommandLineTest):
 
         assert os.getenv('PATH').startswith(
             str(tmpdir) + '/test_id/ve/bin')
+
+    def test_run_buildscript(self, tmpdir):
+        """
+        When running the buildscript, the buildscript is first made executable
+        and then executed.
+        """
+        build = self._create_build(tmpdir)
+        build.workspace.create_clean_workspace()
+
+        build.run_buildscript()
+
+        buildscript = tmpdir.join('test_id', 'sideloader2', 'sideloader',
+                                  'build.sh')
+        assert self.cmds[0] == ['chmod', 'a+x', buildscript]
+        assert self.cmds[1] == [buildscript]
+
+    def test_run_buildscript_no_file(self, tmpdir):
+        """
+        If there is no buildscript specified, no action is taken.
+        """
+        build = self._create_build(tmpdir)
+        build.deploy = build.deploy.override(buildscript='')
+
+        build.run_buildscript()
+
+        assert len(self.cmds) == 0
 
 
 class TestPackage(CommandLineTest):

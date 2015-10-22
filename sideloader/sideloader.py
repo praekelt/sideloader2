@@ -584,7 +584,7 @@ class Deploy(object):
             kwargs[attr] = getattr(self, attr)
             if attr in overrides:
                 value = overrides[attr]
-                if value:
+                if value is not None:
                     kwargs[attr] = value
 
         return Deploy(**kwargs)
