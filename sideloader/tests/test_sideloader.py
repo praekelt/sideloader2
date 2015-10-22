@@ -3,6 +3,7 @@ import os
 import pytest
 
 from sideloader import Build, Deploy, GitRepo, Package, Workspace
+from sideloader.config_files import ConfigFiles
 from sideloader.deploy_types import DeployType
 
 
@@ -250,6 +251,8 @@ class TestBuild(CommandLineTest):
                        'develop', 'sideloader2')
 
         workspace = Workspace('test_id', str(tmpdir), '/opt', repo)
+        workspace.create_clean_workspace()
+
         deploy = Deploy(name='test_deploy', pip=['django', 'pytest'],
                         buildscript='sideloader/build.sh')
         deploy_type = DeployType()
@@ -328,7 +331,6 @@ class TestBuild(CommandLineTest):
         and then executed.
         """
         build = self._create_build(tmpdir)
-        build.workspace.create_clean_workspace()
 
         build.run_buildscript()
 
@@ -347,6 +349,56 @@ class TestBuild(CommandLineTest):
         build.run_buildscript()
 
         assert len(self.cmds) == 0
+
+    def test_copy_build(self, tmpdir):
+        """
+        When the build is copied, the directories in the build folder are
+        copied over to the install location within the package folder.
+        """
+        build = self._create_build(tmpdir)
+
+        build.workspace.make_build_dir()
+        build.workspace.make_package_dir()
+
+        # Set up some dummy files
+        build_dir = tmpdir.join('test_id', 'build')
+        fake_dir = build_dir.mkdir('fake')
+        dummy_dir = build_dir.mkdir('fake', 'dummy')
+        open(str(fake_dir.join('test1.txt')), 'a').close()
+        open(str(dummy_dir.join('test2.txt')), 'a').close()
+
+        build.copy_build()
+
+        install_dir = tmpdir.join('test_id', 'package', 'opt')
+        assert install_dir.join('fake', 'test1.txt').check()
+        assert install_dir.join('fake', 'dummy', 'test2.txt').check()
+
+    def test_copy_config_files(self, tmpdir):
+        """
+        When the config files are copied, the correct config directory is
+        created and the files are copied there.
+        """
+        build = self._create_build(tmpdir)
+
+        build.workspace.make_build_dir()
+        build.workspace.make_package_dir()
+
+        nginx = ConfigFiles.nginx(['config/nginx.conf'])
+        supervisor = ConfigFiles.supervisor(['config/my-app.conf'])
+        build.deploy = build.deploy.override(config_files=[nginx, supervisor])
+
+        # Make some pretend config files
+        build_config_path = tmpdir.mkdir('test_id', 'build', 'config')
+        open(str(build_config_path.join('nginx.conf')), 'a').close()
+        open(str(build_config_path.join('my-app.conf')), 'a').close()
+
+        build.copy_config_files()
+
+        package_path = tmpdir.join('test_id', 'package')
+        assert package_path.join('etc', 'nginx', 'sites-enabled',
+                                 'nginx.conf').check()
+        assert package_path.join('etc', 'supervisor', 'conf.d',
+                                 'my-app.conf').check()
 
 
 class TestPackage(CommandLineTest):
