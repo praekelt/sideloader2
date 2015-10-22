@@ -114,6 +114,69 @@ class TestWorkspace(CommandLineTest):
         # Other files are not deleted
         assert other_file.check()
 
+    def test_make_build_dir(self, tmpdir):
+        """
+        When the build directory is made, the directory exists.
+        """
+        workspace = self._create_workspace(tmpdir)
+        workspace.create_clean_workspace()
+
+        workspace.make_build_dir()
+
+        assert tmpdir.join('test_id', 'build').check()
+
+    def test_make_package_dir(self, tmpdir):
+        """
+        When the package directory is made, the directory exists.
+        """
+        workspace = self._create_workspace(tmpdir)
+        workspace.create_clean_workspace()
+
+        workspace.make_package_dir()
+
+        assert tmpdir.join('test_id', 'package').check()
+
+    def test_make_install_dir(self, tmpdir):
+        """
+        When the install directory is made (after creating the package
+        directory), the directory exists.
+        """
+        workspace = self._create_workspace(tmpdir)
+        workspace.create_clean_workspace()
+        workspace.make_package_dir()
+
+        workspace.make_install_dir()
+
+        assert tmpdir.join('test_id', 'package', 'opt').check()
+
+    def test_create_workspace_dirs_without_root_dir_fails(self, tmpdir):
+        """
+        When any of the workspace directories are created but the workspace
+        hasn't yet been created, an error should be raised.
+        """
+        workspace = self._create_workspace(tmpdir)
+
+        # Try create the directories without creating the workspace
+        with pytest.raises(OSError) as error:
+            workspace.make_build_dir()
+
+        assert error.value.errno == 2
+        assert error.value.strerror == 'No such file or directory'
+
+        # Try create the directories without creating the workspace
+        with pytest.raises(OSError) as error:
+            workspace.make_package_dir()
+
+        assert error.value.errno == 2
+        assert error.value.strerror == 'No such file or directory'
+
+        # Try create the directories without creating the workspace
+        with pytest.raises(OSError) as error:
+            workspace.make_install_dir()
+
+        assert error.value.errno == 2
+        assert error.value.strerror == 'No such file or directory'
+
     def test_fetch_repo(self, tmpdir):
         """
         When the repo is fetched in the workspace, git is called with the
