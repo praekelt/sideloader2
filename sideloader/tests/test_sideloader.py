@@ -74,6 +74,46 @@ class TestWorkspace(CommandLineTest):
         assert (workspace.get_install_path('test') ==
                 str(tmpdir) + '/test_id/package/opt/test')
 
+    def test_create_clean_workspace_creates_dir(self, tmpdir):
+        """
+        When a new clean workspace is created, an empty workspace directory
+        is created.
+        """
+        workspace = self._create_workspace(tmpdir)
+        workspace.create_clean_workspace()
+
+        ws_dir = tmpdir.join('test_id')
+
+        assert ws_dir.check()
+        assert ws_dir.listdir() == []
+
+    def test_create_clean_workspace_cleans_dir(self, tmpdir):
+        """
+        When a workspace is cleaned, the build, package and repo directories
+        should be deleted. Other files should remain.
+        """
+        workspace = self._create_workspace(tmpdir)
+
+        # Create some mess
+        ws_dir = tmpdir.mkdir('test_id')
+        package_dir = ws_dir.mkdir('package')
+        build_dir = ws_dir.mkdir('build')
+        repo_dir = ws_dir.mkdir('sideloader2')
+        other_file = ws_dir.ensure('test-file')
+
+        workspace.create_clean_workspace()
+
+        # The workspace still exists
+        assert ws_dir.check()
+
+        # The package, build and repo directories are deleted
+        assert not package_dir.check()
+        assert not build_dir.check()
+        assert not repo_dir.check()
+
+        # Other files are not deleted
+        assert other_file.check()
+
     def test_fetch_repo(self, tmpdir):
         """
         When the repo is fetched in the workspace, git is called with the
