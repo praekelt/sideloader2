@@ -393,6 +393,7 @@ class Package(object):
         """ Sign the .deb file with the configured gpg key. """
         if self.gpg_key is None:
             log('No GPG key configured, skipping signing')
+            return
         log('Signing package')
         # Find all the .debs in the directory and indiscriminately sign them
         # (there should only be 1)

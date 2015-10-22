@@ -2,7 +2,7 @@ import os
 
 import pytest
 
-from sideloader import Build, Deploy, GitRepo, Workspace
+from sideloader import Build, Deploy, GitRepo, Package, Workspace
 from sideloader.deploy_types import DeployType
 
 
@@ -214,5 +214,88 @@ class TestBuild(CommandLineTest):
             self.prefix_cwd('test_base/test_id/ve/bin'))
 
 
-class TestPackage(object):
-    pass
+class TestPackage(CommandLineTest):
+
+    def _create_package(self, tmpdir):
+        repo = GitRepo('https://github.com/praekelt/sideloader2.git',
+                       'develop', 'sideloader2')
+
+        # Set up the workspace
+        workspace = Workspace('test_id', str(tmpdir), '/opt', repo)
+        workspace.create_clean_workspace()
+        workspace.make_package_dir()
+
+        deploy = Deploy(name='test_deploy', pip=['django', 'pytest'],
+                        version='1.0', user='ubuntu')
+        deploy_type = DeployType()
+
+        package = Package(workspace, deploy, deploy_type)
+        package._cmd = self.cmd
+        return package
+
+    def test_run_fpm(self, tmpdir):
+        """
+        When running the fpm package command, the command is properly
+        constructed.
+        """
+        package = self._create_package(tmpdir)
+
+        # Create some fake project files
+        open(package.workspace.get_package_path('my-file1.txt'), 'a').close()
+        open(package.workspace.get_package_path('my-file2.txt'), 'a').close()
+
+        package.run_fpm()
+
+        assert (
+            self.cmds[0] == [
+                'fpm',
+                '-C', str(tmpdir) + '/test_id/package',
+                '-p', str(tmpdir) + '/test_id/package',
+                '-s', 'dir',
+                '-t', 'deb',
+                '-a', 'amd64',
+                '-n', 'test_deploy',
+                '--after-install', str(tmpdir) + '/test_id/postinstall.sh',
+                '-v', '1.0',
+                '--deb-user', 'ubuntu',
+                'my-file1.txt', 'my-file2.txt'
+            ]
+        )
+
+    def test_sign_debs(self, tmpdir):
+        """
+        When signing .deb files, only the .deb files in the package directory
+        should be signed.
+        """
+        package = self._create_package(tmpdir)
+
+        # Create a fake .deb and another random file
+        open(package.workspace.get_package_path('my-deb.deb'), 'a').close()
+        open(package.workspace.get_package_path('my-file2.txt'), 'a').close()
+
+        package.gpg_key = 'GPGKEY23'
+        package.sign_debs()
+
+        assert (
+            self.cmds[0] == [
+                'dpkg-sig',
+                '-k', 'GPGKEY23',
+                '--sign', 'builder',
+                str(tmpdir) + '/test_id/package/my-deb.deb'
+            ]
+        )
+
+    def test_sign_debs_skipped_if_no_gpg_key(self, tmpdir):
+        """
+        When trying to sign the .deb files and no GPG key has been configured
+        for the Package, signing should be skipped.
+        """
+        package = self._create_package(tmpdir)
+
+        # Create a fake .deb and another random file
+        open(package.workspace.get_package_path('my-deb.deb'), 'a').close()
+        open(package.workspace.get_package_path('my-file2.txt'), 'a').close()
+
+        package.sign_debs()
+
+        assert len(self.cmds) == 0
