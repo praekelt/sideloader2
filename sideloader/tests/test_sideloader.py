@@ -30,7 +30,7 @@ class TestWorkspace(CommandLineTest):
         repo = GitRepo('https://github.com/praekelt/sideloader2.git',
                        'develop', 'sideloader2')
 
-        workspace = Workspace('test_id', str(tmpdir), '/opt', repo)
+        workspace = Workspace('test_id', str(tmpdir), '/var/praekelt', repo)
         workspace._cmd = self.cmd
         return workspace
 
@@ -72,7 +72,7 @@ class TestWorkspace(CommandLineTest):
         """
         workspace = self._create_workspace(tmpdir)
         assert (workspace.get_install_path('test') ==
-                str(tmpdir) + '/test_id/package/opt/test')
+                str(tmpdir) + '/test_id/package/var/praekelt/test')
 
     def test_create_clean_workspace_creates_dir(self, tmpdir):
         """
@@ -147,7 +147,7 @@ class TestWorkspace(CommandLineTest):
 
         workspace.make_install_dir()
 
-        assert tmpdir.join('test_id', 'package', 'opt').check()
+        assert tmpdir.join('test_id', 'package', 'var', 'praekelt').check()
 
     def test_create_workspace_dirs_without_root_dir_fails(self, tmpdir):
         """
