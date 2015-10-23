@@ -1,2 +1,2 @@
-PyYAML==3.11
-click==5.1
+# Our dependencies are all specified in setup.py.
+-e .
