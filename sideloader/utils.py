@@ -16,7 +16,7 @@ def log(message):
 def args_str(args):
     """ Convert a list of arguments to a string. """
     if isinstance(args, list):
-        return ' '.join(args)
+        return ' '.join([str(arg) for arg in args])
 
     return str(args)
 

@@ -18,6 +18,7 @@ class Workspace(object):
     """
 
     debug = False
+    _cmd = lambda self, *args, **kwargs: cmd(*args, debug=self.debug, **kwargs)
 
     def __init__(self, workspace_id, workspace_base, install_location, repo):
         self.install_location = install_location
@@ -38,9 +39,6 @@ class Workspace(object):
                                     install_location.lstrip('/'))
         }
         self._dirs = namedtuple('WorkspaceDirs', dirs.keys())(**dirs)
-
-    def _cmd(self, args):
-        return cmd(args, debug=self.debug)
 
     def set_up(self):
         """
@@ -103,7 +101,13 @@ class Workspace(object):
         Create the install directory (the package directory should already
         exist).
         """
-        os.mkdir(self._dirs.install)
+        package_relpath = os.path.relpath(self._dirs.install,
+                                          self._dirs.package)
+        parts = package_relpath.split(os.sep)
+        subpath = self._dirs.package
+        for part in parts:
+            subpath = os.path.join(subpath, part)
+            os.mkdir(subpath)
 
     def get_path(self, *paths):
         """ Get a path within the workspace directory. """
@@ -129,6 +133,7 @@ class Workspace(object):
 class Build(object):
 
     debug = False
+    _cmd = lambda self, *args, **kwargs: cmd(*args, debug=self.debug, **kwargs)
 
     def __init__(self, workspace, deploy, deploy_type):
         """
@@ -147,9 +152,6 @@ class Build(object):
         self.deploy_type = deploy_type
 
         self.venv_paths = create_venv_paths(workspace.get_path())
-
-    def _cmd(self, args):
-        return cmd(args, debug=self.debug)
 
     def build(self):
         """
@@ -203,7 +205,7 @@ class Build(object):
             'PATH': ':'.join([self.venv_paths.bin, os.getenv('PATH')])
         }
         for k, v in env.items():
-            os.putenv(k, v)
+            os.environ[k] = v
 
     def run_buildscript(self):
         """
@@ -238,13 +240,8 @@ class Build(object):
         self.workspace.make_install_dir()
 
         for directory in os.listdir(self.workspace.get_build_path()):
-            try:
-                shutil.copytree(self.workspace.get_build_path(directory),
-                                self.workspace.get_install_path(directory))
-            except Exception as e:
-                log('ERROR: Could not copy %s to package: %s %s' % (
-                    directory, type(e), e))
-                self.fail_build('Error copying files to package')
+            shutil.copytree(self.workspace.get_build_path(directory),
+                            self.workspace.get_install_path(directory))
 
     def copy_config_files(self):
         """
@@ -332,6 +329,7 @@ class Package(object):
 
     debug = False
     sign = True
+    _cmd = lambda self, *args, **kwargs: cmd(*args, debug=self.debug, **kwargs)
 
     def __init__(self, workspace, deploy, deploy_type, target='deb',
                  gpg_key=None):
@@ -340,9 +338,6 @@ class Package(object):
         self.deploy_type = deploy_type
         self.target = target
         self.gpg_key = gpg_key
-
-    def _cmd(self, args):
-        return cmd(args, debug=self.debug)
 
     def package(self):
         self.run_fpm()
@@ -399,6 +394,7 @@ class Package(object):
         """ Sign the .deb file with the configured gpg key. """
         if self.gpg_key is None:
             log('No GPG key configured, skipping signing')
+            return
         log('Signing package')
         # Find all the .debs in the directory and indiscriminately sign them
         # (there should only be 1)
@@ -575,12 +571,15 @@ class Deploy(object):
         attrs = ['name', 'buildscript', 'postinstall', 'config_files', 'pip',
                  'dependencies', 'virtualenv_prefix', 'allow_broken_build',
                  'user', 'version']
+        for override in overrides.keys():
+            if override not in attrs:
+                raise ValueError('Deploy has no attribute \'%s\'' % override)
         kwargs = {}
         for attr in attrs:
             kwargs[attr] = getattr(self, attr)
             if attr in overrides:
                 value = overrides[attr]
-                if value:
+                if value is not None:
                     kwargs[attr] = value
 
         return Deploy(**kwargs)
