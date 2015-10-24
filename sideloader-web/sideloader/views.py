@@ -709,8 +709,12 @@ def repo_edit(request, id):
     return render(request, 'repo/create_edit.html', d)
 
 @login_required
-def repo_delete(request):
-    pass
+def repo_delete(request, id):
+    repo = models.Repo.objects.get(id=id)
+    projectid = repo.project.id
+    repo.delete()
+
+    return redirect('projects_view', id=projectid)
 
 @login_required
 def repo_create(request, project):

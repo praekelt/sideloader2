@@ -270,8 +270,8 @@ Not Authorized
           DragOptions: { cursor: "pointer", zIndex: 2000 },
           PaintStyle: { strokeStyle: "gray", lineWidth: 2 },
           EndpointStyle: { radius: 1, fillStyle: "gray" },
-          HoverPaintStyle: {strokeStyle: "#ec9f2e" },
-          EndpointHoverStyle: {fillStyle: "#ec9f2e" },
+          HoverPaintStyle: {strokeStyle: "#B92DD8" },
+          EndpointHoverStyle: {fillStyle: "#B92DD8" },
           Container: "graph",
           ConnectionOverlays: [
             [ "Arrow", { location: 1 } ],
@@ -286,6 +286,9 @@ Not Authorized
           win.css('top', y);
           win.css('left', x);
           var w = win.find('span:first').width();
+          if ( w < 80) {  
+            w = 80;
+          };
           win.css('width', w+20);
 
           return win;
@@ -295,7 +298,7 @@ Not Authorized
           // Calculate node vertical separation
           var vh = $('#graph').height();
           var n = a.length;
-          var g = vh - (80*n);
+          var g = vh - (50*n);
           var sep = g/(n+1);
           return sep;
         };
@@ -304,22 +307,38 @@ Not Authorized
           // Render a set of nodes
           var sep = calcSep(a);
 
+          var maxWidth = 0;
+
           $.each(a, function (i, v){
-            createNode(v.name, v.id, offset, (sep*(i+1))+(80*(i)));
+            var node = createNode(v.name, v.id, offset, (sep*(i+1))+(50*(i)));
+            var w = node.width();
+            if (w > maxWidth) {
+              maxWidth = w;
+            };
             e(v);
           });
+
+          return maxWidth;
         };
 
         instance.batch(function () {
           var vh = $('#graph').height();
           // Add project node
-          $('<div class="window" id="projnode"><strong>'+data.project+'</strong></div>').appendTo("#graph");
+          var win = $('<div class="window" id="projnode"><strong>'+data.project+'</strong></div>').appendTo("#graph");
 
-          $('#projnode').css('top', (vh/2)-40);
-          $('#projnode').css('left', 10);
+          var mw = win.find('strong:first').width() + 20;
+
+          win.css('top', (vh/2)-25);
+          win.css('left', 10);
+          if (mw < 80) {
+            mw = 80;
+          };
+          win.css('width', mw);
+
+          var sep = 100;
 
           // Render repo list
-          renderNodes(data.repos, 180, function(v){
+          var w = mw + sep + renderNodes(data.repos, mw + sep, function(v){
             instance.connect({
               source: "projnode",
               target: v.id,
@@ -327,13 +346,16 @@ Not Authorized
             });
           });
 
+          // Render streams list
+          w += sep + renderNodes(data.streams, w + sep, function(v){
+          });
+
           // Render target list
-          renderNodes(data.targets, 800, function(v){
+          renderNodes(data.targets, w + sep, function(v){
           });
 
           // Link stream list
-          renderNodes(data.streams, 600, function(v){
-            
+          $.each(data.streams, function(i, v){
             instance.connect({
               source: v.repo_link,
               target: v.id,
@@ -344,7 +366,7 @@ Not Authorized
               instance.connect({
                 source: v.id,
                 target: t,
-                anchors: ["Right", "Left"],
+                anchors: ["Right", "Left"]
               });
             });
           });
