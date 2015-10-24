@@ -299,3 +299,62 @@ table.table thead .sorting_desc_disabled { background: url('/static/images/sort_
 .project-detail dd{
   margin-left: 85px;
 }
+
+/* Mario */
+
+#graph {
+  width: 100%;
+  height: 70vh;
+  position: absolute;
+}
+
+.chart-demo .window { 
+  border:0.1em dotted #d4e06b;    
+  width:14em; height:4em;         
+  line-height:4em;        
+}
+
+.chart-demo .window:hover, .chart-demo .window.jsplumb-source-hover, .chart-demo .window.jsplumb-target-hover {
+  border:1px solid #DA35FF;
+  color: #DA35FF;
+}
+
+
+.window {
+  background-image: url(/static/images/bg_lighter.png);
+  border:1px solid #555;
+
+  box-shadow: 2px 2px 19px #555;
+  -o-box-shadow: 2px 2px 19px #555;
+  -webkit-box-shadow: 2px 2px 19px #555;
+  -moz-box-shadow: 2px 2px 19px #555;
+
+  text-align:center;
+  z-index:24;
+  cursor:pointer;
+  -moz-border-radius:0.5em;
+  border-radius:0.5em;
+  color: #ddd;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width:80px;
+  height:80px;
+  line-height: 80px;
+  -webkit-transition: -webkit-box-shadow 0.15s ease-in;
+  -moz-transition: -moz-box-shadow 0.15s ease-in;
+  -o-transition: -o-box-shadow 0.15s ease-in;
+  transition: box-shadow 0.15s ease-in;
+}
+
+.window:hover {
+  border:1px solid #814B91;
+  box-shadow: 2px 2px 19px #B92DD8;
+  -o-box-shadow: 2px 2px 19px #B92DD8;
+  -webkit-box-shadow: 2px 2px 19px #B92DD8;
+  -moz-box-shadow: 2px 2px 19px #B92DD8;
+  opacity:0.9;
+}
+
+path, .jsplumb-endpoint { cursor:pointer; }
+

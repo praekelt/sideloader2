@@ -27,8 +27,10 @@ Not Authorized
 <div class="col-lg-9">
   <br/>
   <ul class="nav nav-tabs" role="tablist" id="projectTabs">
-    <li role="presentation" class="active"><a href="#repos" aria-controls="repos" role="tab" data-toggle="tab">Repos</a></li>
+    <li role="presentation" class="active"><a href="#project" aria-controls="project" role="tab" data-toggle="tab">Project</a></li>
+    <li role="presentation"><a href="#repos" aria-controls="repos" role="tab" data-toggle="tab">Repos</a></li>
     <li role="presentation"><a href="#streams" aria-controls="streams" role="tab" data-toggle="tab">Streams</a></li>
+    <li role="presentation"><a href="#targets" aria-controls="targets" role="tab" data-toggle="tab">Deployments</a></li>
     <li role="presentation"><a href="#resources" aria-controls="resources" role="tab" data-toggle="tab">Resources</a></li>
     <li role="presentation"><a href="#releases" aria-controls="releases" role="tab" data-toggle="tab">Releases</a></li>
     <li role="presentation"><a href="#builds" aria-controls="builds" role="tab" data-toggle="tab">Builds</a></li>
@@ -36,7 +38,11 @@ Not Authorized
 
   <div class="tab-content">
     <!-- Tabs -->
-    <div role="tabpanel" class="tab-pane active" id="repos">
+    <div role="tabpanel" class="tab-pane active" id="project">
+      <br/>
+      <div class="canvas-wide jtk-surface jtk-surface-nopan chart" id="graph"></div>
+    </div>
+    <div role="tabpanel" class="tab-pane" id="repos">
       <br/>
       <p>
       {% if repos %}
@@ -70,6 +76,41 @@ Not Authorized
         <a href="{% url 'repo_create' project=project.id %}" class="btn btn-default">Add</a>
       </p>
     </div>
+    <div role="tabpanel" class="tab-pane" id="targets">
+      <br/>
+      <p>
+      {% if targets %}
+        <table class="table table-hover table-bordered table-condensed">
+          <thead><tr>
+            <th>Description</th>
+            <th>Mode</th>
+            <th>Target</th>
+            <th>State</th>
+            <th></th>
+          </tr></thead>
+          <tbody>
+            {% for target in targets %}
+              <tr>
+                <td >{{ target.description }}</td>
+                <td >{{ target.stream_mode }}</td>
+                <td ></td>
+                <td >{{ target.state }}</td>
+                <td width="120em">
+                  <div class="btn-group btn-group-sm">
+                    <a class="btn btn-default" href="{% url 'target_edit' id=target.id %}" title="Edit"><span class="glyphicon glyphicon-edit electric"></span></a>
+                    <a class="btn btn-default" href="{% url 'target_delete' id=target.id %}" title="Delete"><span class="glyphicon glyphicon-remove electric"></span></a>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% endif %}
+        <a href="{% url 'target_create' project=project.id %}" class="btn btn-default">Add</a>
+      </p>
+
+    </div>
+
     <div role="tabpanel" class="tab-pane" id="resources">
       <br/>
 
@@ -217,12 +258,118 @@ Not Authorized
 {% endblock %}
 
 {% block script %}
+<script src="/static/js/jsPlumb-2.0.4.js"></script>
 <script>
+  var loadGraph = function() {
+    jsPlumb.ready(function() {
+      $.getJSON("{% url 'project_graph' id=project.id %}", function (data) {
+        $("#graph").replaceWith('<div class="canvas-wide jtk-surface jtk-surface-nopan chart" id="graph"></div>');
+
+        var instance = jsPlumb.getInstance({
+          Connector: [ "Bezier", { curviness: 50 } ],
+          DragOptions: { cursor: "pointer", zIndex: 2000 },
+          PaintStyle: { strokeStyle: "gray", lineWidth: 2 },
+          EndpointStyle: { radius: 1, fillStyle: "gray" },
+          HoverPaintStyle: {strokeStyle: "#ec9f2e" },
+          EndpointHoverStyle: {fillStyle: "#ec9f2e" },
+          Container: "graph",
+          ConnectionOverlays: [
+            [ "Arrow", { location: 1 } ],
+          ]
+        });
+
+        var createNode = function (content, id, x, y){
+          // Create a node 
+          var win = $('<div class="window" id="'+id+'"><span class="window-content">'+content+'</span></div>')
+          win.appendTo("#graph");
+
+          win.css('top', y);
+          win.css('left', x);
+          var w = win.find('span:first').width();
+          win.css('width', w+20);
+
+          return win;
+        };
+
+        var calcSep = function (a) {
+          // Calculate node vertical separation
+          var vh = $('#graph').height();
+          var n = a.length;
+          var g = vh - (80*n);
+          var sep = g/(n+1);
+          return sep;
+        };
+
+        var renderNodes = function (a, offset, e){
+          // Render a set of nodes
+          var sep = calcSep(a);
+
+          $.each(a, function (i, v){
+            createNode(v.name, v.id, offset, (sep*(i+1))+(80*(i)));
+            e(v);
+          });
+        };
+
+        instance.batch(function () {
+          var vh = $('#graph').height();
+          // Add project node
+          $('<div class="window" id="projnode"><strong>'+data.project+'</strong></div>').appendTo("#graph");
+
+          $('#projnode').css('top', (vh/2)-40);
+          $('#projnode').css('left', 10);
+
+          // Render repo list
+          renderNodes(data.repos, 180, function(v){
+            instance.connect({
+              source: "projnode",
+              target: v.id,
+              anchors: ["Right", "Left"],
+            });
+          });
+
+          // Render target list
+          renderNodes(data.targets, 800, function(v){
+          });
+
+          // Link stream list
+          renderNodes(data.streams, 600, function(v){
+            
+            instance.connect({
+              source: v.repo_link,
+              target: v.id,
+              anchors: ["Right", "Left"],
+            });
+            
+            $.each(v.target_link, function (i, t) {
+              instance.connect({
+                source: v.id,
+                target: t,
+                anchors: ["Right", "Left"],
+              });
+            });
+          });
+
+          instance.draggable(
+            jsPlumb.getSelector(".chart .window")
+          );
+        })
+      });
+    });
+  };
+
+  var graphLoaded = false;
+
   $('#projectTabs a').click(function (e) {
     var control = $(this)[0].attributes[1].value;
+
     $.cookie('prjtab', control);
     e.preventDefault();
     $(this).tab('show');
+
+    if (control = "project"){
+      console.log('prj');
+      loadGraph();
+    };
   })
 
   var lastTab = $.cookie('prjtab');
@@ -230,5 +377,7 @@ Not Authorized
     tab = $("[aria-controls='" + lastTab + "']");
     tab.click();
   }
+  
+
 </script>
 {% endblock %}

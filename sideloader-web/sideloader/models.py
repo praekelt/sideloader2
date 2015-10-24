@@ -89,52 +89,11 @@ class PackageRepo(models.Model):
 
     created_by_user = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="PackageRepoCreatedBy")
 
-class Stream(models.Model):
-    name = models.CharField(max_length=255)
-    repo = models.ForeignKey(Repo)
-
-    package_type = models.CharField(max_length=64, default='deb') #DEB, RPM, TAR, Docker..
-
-    post_build = models.TextField(blank=True)
-
-    branch = models.CharField(max_length=256, default='develop')
-    architecture = models.CharField(max_length=64, default='amd64')
-
-    require_signoff = models.BooleanField(default=False)
-    signoff_list = models.TextField(blank=True)
-    quorum = models.IntegerField(default=0)
-
-    auto_release = models.BooleanField(default=False)
-
-    notify = models.BooleanField(default=False)
-    notify_list = models.TextField(blank=True)
-
     def __unicode__(self):
         return self.name
 
     def __str__(self):
         return self.__unicode__().encode('utf-8', 'replace')
-
-    def email_list(self):
-        if not '@' in self.signoff_list:
-            return []
-
-        return self.signoff_list.replace('\r', ' ').replace(
-            '\n', ' ').replace(',', ' ').strip().split()
-
-    def last_release(self):
-        rs = self.release_set.filter(waiting=False).order_by('-release_date')
-        if rs:
-            return rs[0]
-        else:
-            return None
-
-    def next_release(self):
-        rs = self.release_set.filter(waiting=True).order_by('-release_date')
-        if rs:
-            return rs[0]
-        else:
-            return None
 
 class Build(models.Model):
     repo = models.ForeignKey(Repo)
@@ -156,18 +115,17 @@ class Build(models.Model):
 
     build_file = models.CharField(max_length=255)
 
-class Target(models.Model):
-    stream = models.ForeignKey(Stream)
 
+class Target(models.Model):
     description = models.CharField(max_length=256)
 
     stream_mode = models.CharField(max_length=64, default='repo')
 
     custom_script = models.TextField(blank=True)
 
-    package_repo = models.ForeignKey(PackageRepo, blank=True)
+    package_repo = models.ForeignKey(PackageRepo, blank=True, null=True)
 
-    server = models.ForeignKey(Server, blank=True)
+    server = models.ForeignKey(Server, blank=True, null=True)
 
     post_deploy = models.TextField(blank=True)
 
@@ -175,8 +133,54 @@ class Target(models.Model):
 
     log = models.TextField(default="")
 
+    project = models.ForeignKey(Project)
+
     # 0 - Nothing, 1 - In progress, 2 - Good, 3 - Bad
-    state = models.IntegerField()
+    state = models.IntegerField(default=0)
+
+    def __unicode__(self):
+        return self.description
+
+    def __str__(self):
+        return self.__unicode__().encode('utf-8', 'replace')
+
+class Stream(models.Model):
+    name = models.CharField(max_length=255)
+    repo = models.ForeignKey(Repo)
+
+    package_type = models.CharField(max_length=64, default='deb') #DEB, RPM, TAR, Docker..
+
+    post_build = models.TextField(blank=True)
+
+    branch = models.CharField(max_length=256, default='develop')
+    architecture = models.CharField(max_length=64, default='amd64')
+
+    require_signoff = models.BooleanField(default=False)
+    signoff_list = models.TextField(blank=True)
+    quorum = models.IntegerField(default=0)
+
+    auto_release = models.BooleanField(default=False)
+
+    notify = models.BooleanField(default=False)
+    notify_list = models.TextField(blank=True)
+
+    project = models.ForeignKey(Project)
+
+    targets = models.ManyToManyField(Target, blank=True)
+
+    def __unicode__(self):
+        return self.name
+
+    def __str__(self):
+        return self.__unicode__().encode('utf-8', 'replace')
+
+    def email_list(self):
+        if not '@' in self.signoff_list:
+            return []
+
+        return self.signoff_list.replace('\r', ' ').replace(
+            '\n', ' ').replace(',', ' ').strip().split()
+
 
 class Release(models.Model):
     release_date = models.DateTimeField(auto_now_add=True)

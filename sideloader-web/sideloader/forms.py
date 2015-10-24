@@ -76,7 +76,21 @@ class RepoForm(BaseModelForm):
 
         return cleaned_data
 
+class TargetForm(BaseModelForm):
+
+
+    class Meta:
+        model = models.Target
+        exclude = ('current_build', 'log', 'state', 'project')
+
 class StreamForm(BaseModelForm):
+
+    targets = forms.ModelMultipleChoiceField(
+        queryset=models.Target.objects.all(),
+        required=False
+    )
+
+    targets.help_text = ''
 
     package_type = forms.ChoiceField(
         label='Package type',
@@ -99,13 +113,6 @@ class StreamForm(BaseModelForm):
             ('i386', 'i386'),
         )
     )
-
-    targets = forms.ModelMultipleChoiceField(
-        queryset=models.Server.objects.all().order_by('name'),
-        required=False
-    )
-
-    targets.help_text = ''
 
     auto_release = forms.BooleanField(
         help_text="Automatically deploy new builds to this release workflow",
@@ -136,7 +143,8 @@ class StreamForm(BaseModelForm):
         exclude = ('project',)
         fields = (
             'name', 'repo', 'branch', 'package_type', 'architecture',
-            'post_build', 'targets', 'auto_release', 'require_signoff',
+            'targets',
+            'post_build', 'auto_release', 'require_signoff',
             'signoff_list', 'notify', 'notify_list',
         )
 

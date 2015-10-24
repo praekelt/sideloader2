@@ -376,22 +376,16 @@ def stream_create(request, project):
     if request.method == "POST":
         form = forms.StreamForm(request.POST)
         if form.is_valid():
-            flow = form.save(commit=False)
+            s = form.save(commit=False)
 
-            flow.project = p 
-            flow.save()
-
-            # Create target link if none exists
-            for server in form.cleaned_data['targets']:
-                try:
-                    target = models.Target.objects.get(server=server, release=flow)
-                except models.Target.DoesNotExist:
-                    target = models.Target.objects.create(server=server, release=flow)
-                    target.save()
+            s.project = p 
+            s.save()
+            form.save_m2m()
 
             return redirect('projects_view', id=project)
     else:
         form = forms.StreamForm()
+        form.fields['targets'].queryset = p.target_set.all().order_by('description')
         form.fields['repo'].queryset = p.repo_set.all().order_by('github_url')
 
     return render(request, 'stream/create_edit.html', {
@@ -410,30 +404,13 @@ def stream_edit(request, id):
         if form.is_valid():
             stream = form.save(commit=False)
             stream.save()
-
-            # Create target link if none exists
-            for server in form.cleaned_data['targets']:
-                try:
-                    target = models.Target.objects.get(server=server, release=stream)
-                except models.Target.DoesNotExist:
-                    target = models.Target.objects.create(server=server, release=stream)
-                    target.save()
-
-            # Delete old target links
-            ids = [server.id for server in form.cleaned_data['targets']]
-            targets = stream.target_set.all()
-            for target in targets:
-                if target.server.id not in ids:
-                    print "Deleting old target", target
-                    target.delete()
+            form.save_m2m()
 
             return redirect('projects_view', id=stream.repo.project.id)
 
     else:
         form = forms.StreamForm(instance=stream)
-        form.initial['targets'] = [t.server for t in stream.target_set.all()]
-
-        
+        form.fields['targets'].queryset = stream.project.target_set.all().order_by('description')
 
     return render(request, 'stream/create_edit.html', {
         'form': form, 
@@ -441,16 +418,6 @@ def stream_edit(request, id):
         'project': stream.repo.project,
         'projects': getProjects(request)
     })
-
-@login_required
-def release_delete(request, id):
-    release = models.Release.objects.get(id=id)
-    project = release.flow.project
-    if (request.user.is_superuser) or (
-        project in request.user.project_set.all()):
-        release.delete()
-
-    return redirect('projects_view', id=project.id)
 
 @login_required
 def stream_delete(request, id):
@@ -502,6 +469,75 @@ def stream_schedule(request, flow, build):
     })
 
 @login_required
+def target_create(request, project):
+    project = models.Project.objects.get(id=project)
+
+    if request.method == "POST":
+        form = forms.TargetForm(request.POST)
+
+        if form.is_valid():
+            target = form.save(commit=False)
+            target.project = project
+            target.save()
+
+            return redirect('projects_view', id=project.id)
+
+    else:
+        form = forms.TargetForm()
+        #form.fields['server'].queryset = m.all().order_by('github_url')
+
+    return render(request, 'target/create_edit.html', {
+        'form': form, 
+        'project': project,
+        'projects': getProjects(request)
+    })
+
+@login_required
+def target_edit(request, id):
+    target = models.Target.objects.get(id=id)
+
+    if request.method == "POST":
+        form = forms.TargetForm(request.POST, instance=target)
+
+        if form.is_valid():
+            target = form.save(commit=False)
+            target.save()
+
+            return redirect('projects_view', id=target.project.id)
+
+    else:
+        form = forms.TargetForm(instance=target)
+
+    return render(request, 'target/create_edit.html', {
+        'form': form, 
+        'target': target,
+        'project': target.project,
+        'projects': getProjects(request)
+    })
+
+@login_required
+def target_delete(request, id):
+    target = models.Target.objects.get(id=id)
+    project = target.project
+    if (request.user.is_superuser) or (
+        project in request.user.project_set.all()):
+        target.delete()
+
+    return redirect('projects_view', id=project.id)
+
+
+@login_required
+def release_delete(request, id):
+    release = models.Release.objects.get(id=id)
+    project = release.flow.project
+    if (request.user.is_superuser) or (
+        project in request.user.project_set.all()):
+        release.delete()
+
+    return redirect('projects_view', id=project.id)
+
+
+@login_required
 def build_view(request, id):
     build = models.Build.objects.get(id=id)
 
@@ -545,6 +581,7 @@ def projects_view(request, id):
         d = {
             'project': project,
             'repos': repos,
+            'targets': project.target_set.all().order_by('description'),
             'builds': reversed(builds),
             'streams': streams,
             'releases': reversed(releases[-5:]),
@@ -554,6 +591,42 @@ def projects_view(request, id):
         d = {}
 
     return render(request, 'projects/view.html', d)
+
+@login_required
+def project_graph(request, id):
+    # Server checkin endpoint
+    project = models.Project.objects.get(id=id)
+
+    data = {
+        'project': project.name,
+        'repos': [],
+        'targets': [],
+        'streams': []
+    }
+
+    for repo in project.repo_set.all():
+        data['repos'].append({
+            'name': repo.github_url,
+            'id': 'R%s' % repo.id
+        })
+
+    for target in project.target_set.all():
+        data['targets'].append({
+            'name': target.description,
+            'id': 'T%s' % target.id
+        })
+
+    for stream in project.stream_set.all():
+        data['streams'].append({
+            'id': 'S%s' % stream.id,
+            'name': stream.name,
+            'branch': stream.branch,
+            'repo_link': 'R%s' % stream.repo.id,
+            'target_link': ['T%s' % t.id for t in stream.targets.all()]
+        })
+
+    return HttpResponse(json.dumps(data), 
+        content_type='application/json')
 
 @login_required
 def projects_delete(request, id):
@@ -691,8 +764,6 @@ def projects_build(request, id):
             build = models.Build.objects.create(project=project, state=0, build_num=bcount)
 
             task_id = tasks.build(build)
-
-            print task_id
 
             build.task_id = task_id
             build.save()
