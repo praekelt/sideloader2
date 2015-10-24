@@ -29,7 +29,7 @@ Not Authorized
   <ul class="nav nav-tabs" role="tablist" id="projectTabs">
     <li role="presentation" class="active"><a href="#repos" aria-controls="repos" role="tab" data-toggle="tab">Repos</a></li>
     <li role="presentation"><a href="#streams" aria-controls="streams" role="tab" data-toggle="tab">Streams</a></li>
-    <li role="presentation"><a href="#targets" aria-controls="targets" role="tab" data-toggle="tab">Targets</a></li>
+    <li role="presentation"><a href="#resources" aria-controls="resources" role="tab" data-toggle="tab">Resources</a></li>
     <li role="presentation"><a href="#releases" aria-controls="releases" role="tab" data-toggle="tab">Releases</a></li>
     <li role="presentation"><a href="#builds" aria-controls="builds" role="tab" data-toggle="tab">Builds</a></li>
   </ul>
@@ -70,7 +70,9 @@ Not Authorized
         <a href="{% url 'repo_create' project=project.id %}" class="btn btn-default">Add</a>
       </p>
     </div>
-    <div role="tabpanel" class="tab-pane" id="targets">
+    <div role="tabpanel" class="tab-pane" id="resources">
+      <br/>
+
     </div>
     <div role="tabpanel" class="tab-pane" id="streams">
       <br/>
@@ -80,6 +82,10 @@ Not Authorized
           <tbody>
             <thead><tr>
               <th>Name</th>
+              <th>Repo</th>
+              <th>Branch</th>
+              <th>Type</th>
+              <th>Architecture</th>
               <th>Auto</th>
               <th>Current Release</th>
               <th></th>
@@ -87,6 +93,10 @@ Not Authorized
             {% for stream in streams %}
               <tr>
                 <td>{{ stream.name }}</td>
+                <td>{{ stream.repo }}</td>
+                <td>{{ stream.branch }}</td>
+                <td>{{ stream.type }}</td>
+                <td>{{ stream.architecture }}</td>
                 <td>{% if stream.auto_release %}<span class="glyphicon glyphicon-ok electric"></span>{% endif %}</td>
                 {% if stream.stream_mode == 0 %}
                 <td>{{ stream.last_release.build.build_file }}</td>
@@ -106,9 +116,8 @@ Not Authorized
                 {% endfor %}
                 </td>
                 {% endif %}
-                <td width="120em">
+                <td width="90em">
                   <div class="btn-group btn-group-sm">
-                    <a class="btn btn-default" href="{% url 'manifest_view' id=stream.id %}" title="Configure"><span class="glyphicon glyphicon-wrench electric"></span></a>
                     <a class="btn btn-default" href="{% url 'stream_edit' id=stream.id %}" title="Edit"><span class="glyphicon glyphicon-edit electric"></span></a>
                     <a class="btn btn-default" href="{% url 'stream_delete' id=stream.id %}" title="Delete"><span class="glyphicon glyphicon-remove electric"></span></a>
                   </div>
@@ -127,6 +136,7 @@ Not Authorized
       </p>
     </div>
     <div role="tabpanel" class="tab-pane" id="releases">
+      <br/>
       <p>
         <table class="table table-hover table-bordered table-condensed">
           <thead><tr><th>Request date</th><th>Workflow</th><th>Build</th><th>Status</th><th></th></tr></thead>
