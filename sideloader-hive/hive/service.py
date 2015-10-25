@@ -3,12 +3,106 @@ import json
 import traceback
 import yaml
 import socket
+import importlib
 
 from twisted.application import service
 from twisted.internet import task, reactor, protocol, defer
 from twisted.python import log
 
 from txredis.client import RedisClient, RedisSubscriber
+
+class HiveQueue(object):
+    def __init__(self, config, svc):
+        self.config = config
+        self.service = svc
+
+        self.id = config['id']
+        self.expire = int(config.get('expire', 3600))
+        self.plugin = self.loadPlugin(config['plugin'])
+
+        self.inter = float(config.get('inter', 1))
+
+        self.fast_inter = float(config.get('fast_inter', 0.1))
+
+        self.max_jobs = config.get('max_jobs', 5)
+        self.jobs = 0
+        self.cycl = 0
+
+        self.t = task.LoopingCall(self.queueRun)
+
+    def loadPlugin(self, plugin):
+        return getattr(importlib.import_module(plugin), 'Plugin')(self.config)
+        
+    @defer.inlineCallbacks
+    def grabQueue(self):
+        item = yield self.service.client.rpop("hive.q%s" % self.id)
+        if item:
+            defer.returnValue(json.loads(item))
+        else:
+            defer.returnValue(None)
+
+    @defer.inlineCallbacks
+    def processQueue(self, item):
+        m = item.get('message')
+        if m:
+            uid = item['id']
+            yield self.service.setStatus("processing:%s:%s:%s" % (
+                m, uid, time.time()))
+            try:
+                result = yield self.processItem(m, item.get('params', {}))
+
+                d = {
+                    'result': result,
+                    'time': time.time()
+                }
+
+                yield self.service.client.set('hive.q%s.%s' % (self.id, uid),
+                    json.dumps(d), expire=self.expire)
+
+            except Exception, e:
+                log.msg('Error %s' % e)
+                log.msg(traceback.format_exc())
+
+    @defer.inlineCallbacks
+    def reQueue(self, request):
+        response = yield self.service.client.lpush("hive.q%s" % self.id)
+
+    def processItem(self, message, params):
+        fn = getattr(self.plugin, 'call_%s' % message)
+
+        return defer.maybeDeferred(fn, params)
+
+
+    @defer.inlineCallbacks
+    def queueRun(self):
+        if self.cycl > 0:
+            self.cycl -= 1
+            defer.returnValue(None)
+
+        if self.jobs >= self.max_jobs:
+            defer.returnValue(None)
+        
+        item = yield self.grabQueue()
+
+        if item:
+            self.jobs += 1
+            yield self.processQueue(item)
+            self.jobs -= 1
+        else:
+            self.cycl = self.inter/self.fast_inter
+
+            yield self.service.setStatus("ready")
+
+        defer.returnValue(None)
+
+    def startQueue(self):
+        """Starts the timer for this queue"""
+        self.td = self.t.start(self.fast_inter)
+
+    def stopQueue(self):
+        """Stops the timer for this queue"""
+        self.td = None
+        self.t.stop()
 
 
 class HiveService(service.Service):
@@ -17,7 +111,7 @@ class HiveService(service.Service):
     """
     def __init__(self, config):
         try:
-            self.config = yaml.load(open(config))
+            self.config = yaml.load(config)
         except:
             self.config = {}
 
@@ -26,65 +120,27 @@ class HiveService(service.Service):
         self.redis_host = self.config.get('redis_host', 'localhost')
         self.redis_port = int(self.config.get('redis_port', 6379))
 
-
-    @defer.inlineCallbacks
-    def grabQueue(self, queue=0):
-        response = yield self.client.rpop("hive.q%s" % queue)
-
-        if response:
-            response = json.loads(response)
+        self.expire = 3600
         
-        defer.returnValue(response)
+        self.queues = {}
 
-    @defer.inlineCallbacks
-    def reQueue(self, request, queue=0):
-        response = yield self.client.lpush("hive.q%s" % queue)
-
-    def processItem(self, item):
-        pass
+        self.t = task.LoopingCall(self.heartbeat)
 
     def heartbeat(self):
         return self.client.set(
-            "hive.server.%s.heartbeat" % self.hostname, time.time(), expire=3600)
+            "hive.server.%s.heartbeat" % self.hostname, time.time(), expire=self.expire)
 
     def setStatus(self, status):
         return self.client.set(
-            "hive.server.%s.status" % self.hostname, status, expire=3600)
+            "hive.server.%s.status" % self.hostname, status, expire=self.expire)
 
-    @defer.inlineCallbacks
-    def queueRun(self):
-        item = yield self.grabQueue()
-        
-        yield self.heartbeat()
+    def startBeat(self):
+        self.td = self.t.start(1.0)
 
-        if item:
-            m = item.get('message')
-            if m:
-                id = item['id']
-                yield self.setStatus("processing:%s:%s:%s" % (
-                    m, id, time.time()))
-                try:
-                    result = yield self.processItem(item)
-
-                    d = {
-                        'result': result,
-                        'time': time.time()
-                    }
-
-                    yield self.client.set(
-                        'hive.q0.%s' % id, json.dumps(d), expire=3600)
-
-                except Exception, e:
-                    log.msg('Error %s' % e)
-                    log.msg(traceback.format_exc())
-
-            reactor.callLater(0.01, self.queueRun)
-        else:
-            reactor.callLater(1.0, self.queueRun)
-
-        yield self.setStatus("ready")
-
-        defer.returnValue(None)
+    def setupQueues(self):
+        queues = self.config.get('queues', [])
+        for queue in queues:
+            self.queues[queue['name']] = HiveQueue(queue, self)
 
     @defer.inlineCallbacks
     def startService(self):
@@ -92,7 +148,10 @@ class HiveService(service.Service):
         self.client = yield clientCreator.connectTCP(
             self.redis_host, self.redis_port)
 
-        yield self.queueRun()
+        reactor.callWhenRunning(self.startBeat)
+        self.setupQueues()
+        for k, v in self.queues.items():
+            reactor.callWhenRunning(v.startQueue)
 
 def makeService(config):
     return HiveService(config)

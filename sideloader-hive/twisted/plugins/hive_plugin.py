@@ -18,6 +18,10 @@ class HiveServiceMaker(object):
     options = Options
  
     def makeService(self, options):
-        return service.makeService(options['config'])
+        try:
+            config = open(options['config'])
+        except:
+            config = "{}"
+        return service.makeService(config)
  
 serviceMaker = HiveServiceMaker()
