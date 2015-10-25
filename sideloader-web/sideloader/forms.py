@@ -1,7 +1,10 @@
+import re
+
 from django.contrib.auth.models import User
 from django import forms
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Submit
+
 import models
 
 
@@ -76,7 +79,63 @@ class RepoForm(BaseModelForm):
 
         return cleaned_data
 
+class ServerRequestForm(BaseModelForm):
+    inftype = forms.ChoiceField(
+        label='Infrastructure type',
+        widget=forms.Select,
+        choices=(
+            ('prd', 'Production'),
+            ('qa', 'QA'), ('stg', 'Staging')))
+    
+    cpus = forms.IntegerField(label="CPU Cores", required=True,
+        initial=1,
+        max_value=8,
+        min_value=1,
+        help_text="Must be between 1 and 8")
+
+    memory = forms.IntegerField(label="Memory (GB)", required=True, 
+        initial=2,
+        max_value=24,
+        min_value=1,
+        help_text="Must be between 1 and 24")
+
+    disk = forms.IntegerField(label="Disk space (GB)", required=True,
+        initial=50,
+        max_value=250,
+        min_value=25,
+        help_text="Must be between 25 and 250")
+
+    class Meta:
+        model = models.ServerRequest
+        exclude = (
+            'requested_by', 'project', 'approved_by', 'approval',
+            'provisioned', 'request_date'
+        )
+
+    def clean(self):
+        cleaned_data = super(ServerRequestForm, self).clean()
+
+        name = cleaned_data['name'].strip()
+
+        if ' ' in name:
+            raise forms.ValidationError("Server name may not contain spaces")
+
+        if not re.match(r'^[\w-]+$', name):
+            raise forms.ValidationError("Server name may only contain letters and numbers")
+
+        cleaned_data['name'] = name.lower()
+
+        return cleaned_data
+
 class TargetForm(BaseModelForm):
+    stream_mode = forms.ChoiceField(
+        label='Deploy mode',
+        widget=forms.Select,
+        choices=(
+            ('repo', 'Package repository'),
+            ('server', 'Server'),
+        )
+    )
 
 
     class Meta:

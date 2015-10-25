@@ -329,22 +329,28 @@ table.table thead .sorting_desc_disabled { background: url('/static/images/sort_
   -webkit-box-shadow: 2px 2px 19px #555;
   -moz-box-shadow: 2px 2px 19px #555;
 
-  text-align:center;
-  z-index:24;
-  cursor:pointer;
-  -moz-border-radius:0.5em;
-  border-radius:0.5em;
+  text-align: center;
+  z-index: 24;
+  cursor: pointer;
+  -moz-border-radius: 0.5em;
+  border-radius: 0.5em;
   color: #ddd;
   position: absolute;
   top: 0;
   left: 0;
-  width:80px;
-  height:50px;
+  width: 400px;
+  height: 50px;
   line-height: 50px;
   -webkit-transition: -webkit-box-shadow 0.15s ease-in;
   -moz-transition: -moz-box-shadow 0.15s ease-in;
   -o-transition: -o-box-shadow 0.15s ease-in;
   transition: box-shadow 0.15s ease-in;
+  overflow: none;
+}
+
+.window-content {
+  overflow: none;
+  text-overflow: none;
 }
 
 .window:hover {

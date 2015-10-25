@@ -14,6 +14,7 @@ urlpatterns = patterns('',
     url(r'^projects/view/(?P<id>[\d]+)$', 'sideloader.views.projects_view', name='projects_view'),
     url(r'^projects/build/(?P<id>[\d]+)$', 'sideloader.views.projects_build', name='projects_build'),
     url(r'^projects/delete/(?P<id>[\d]+)$', 'sideloader.views.projects_delete', name='projects_delete'),
+    url(r'^projects/server/request/(?P<project>[\d]+)$', 'sideloader.views.server_request', name='server_request'),
 
     url(r'^projects/build/view/(?P<id>[\d]+)$', 'sideloader.views.build_view', name='build_view'),
     url(r'^projects/build/log/(?P<id>[\d]+)$', 'sideloader.views.build_output', name='build_output'),

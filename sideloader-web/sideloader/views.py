@@ -578,6 +578,8 @@ def projects_view(request, id):
 
         streams.sort(key=lambda r: r.name)
 
+        requests = project.serverrequest_set.filter(approval=0).order_by('request_date')
+
         d = {
             'project': project,
             'repos': repos,
@@ -585,7 +587,8 @@ def projects_view(request, id):
             'builds': reversed(builds),
             'streams': streams,
             'releases': reversed(releases[-5:]),
-            'projects': getProjects(request) 
+            'projects': getProjects(request),
+            'requests': requests
         }
     else:
         d = {}
@@ -683,6 +686,30 @@ def projects_edit(request, id):
     }
 
     return render(request, 'projects/create_edit.html', d)
+
+@login_required
+def server_request(request, project):
+    project = models.Project.objects.get(id=project)
+
+    if request.method == "POST":
+        form = forms.ServerRequestForm(request.POST)
+        if form.is_valid():
+            server = form.save(commit=False)
+            server.requested_by = request.user
+            server.project = project
+            server.save()
+
+            return redirect('projects_view', id=project.id)
+
+    else:
+        form = forms.ServerRequestForm()
+
+
+    return render(request, 'projects/server_request.html', {
+        'form': form,
+        'project': project,
+        'projects': getProjects(request),
+    })
 
 @login_required
 def repo_edit(request, id):

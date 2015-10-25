@@ -24,7 +24,7 @@ Not Authorized
   <br/>
 </div>
 
-<div class="col-lg-9">
+<div class="col-lg-12">
   <br/>
   <ul class="nav nav-tabs" role="tablist" id="projectTabs">
     <li role="presentation" class="active"><a href="#project" aria-controls="project" role="tab" data-toggle="tab">Project</a></li>
@@ -113,7 +113,36 @@ Not Authorized
 
     <div role="tabpanel" class="tab-pane" id="resources">
       <br/>
-
+      {% if requests %}
+        <h4>Pending requests</h4>
+        <table class="table table-hover table-bordered table-condensed">
+          <thead><tr>
+            <th>Server name</th>
+            <th>Requester</th>
+            <th>Cores</th>
+            <th>Memory</th>
+            <th>Disk</th>
+            <th></th>
+          </tr></thead>
+          <tbody>
+            {% for request in requests %}
+              <tr>
+                <td >{{ request.inftype}}-{{ request.name }}.za.prk-host.net</td>
+                <td >{{ request.requested_by }}</td>
+                <td >{{ request.cpus }}</td>
+                <td >{{ request.memory }}</td>
+                <td >{{ request.disk }}</td>
+                <td width="60em">
+                  <div class="btn-group btn-group-sm">
+                    <a class="btn btn-default" href="#" title="Cancel"><span class="glyphicon glyphicon-remove electric"></span></a>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% endif %}
+      <a href="{% url 'server_request' project=project.id %}" class="btn btn-default">Request server</a>
     </div>
     <div role="tabpanel" class="tab-pane" id="streams">
       <br/>

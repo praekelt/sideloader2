@@ -80,6 +80,32 @@ class Server(models.Model):
     def __str__(self):
         return self.__unicode__().encode('utf-8', 'replace')
 
+class ServerRequest(models.Model):
+    name = models.CharField(max_length=255)
+
+    requested_by = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="ServerRequestedBy")
+
+    inftype = models.CharField(max_length=255)
+
+    cpus = models.IntegerField(default=2)
+    memory = models.IntegerField(default=2)
+    disk = models.IntegerField(default=50)
+
+    project = models.ForeignKey(Project, blank=True)
+
+    approved_by = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="ServerApprovedBy", blank=True, null=True)
+
+    approval = models.IntegerField(default=0)
+
+    provisioned = models.BooleanField(default=False)
+
+    request_date = models.DateTimeField(auto_now_add=True)
+
+    def __unicode__(self):
+        return self.name
+
+    def __str__(self):
+        return self.__unicode__().encode('utf-8', 'replace')
 
 class PackageRepo(models.Model):
     name = models.CharField(max_length=255)
