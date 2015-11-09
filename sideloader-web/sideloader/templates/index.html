@@ -12,89 +12,64 @@
       <p><a class="btn btn-primary btn-large" href="{% url 'help_index' %}">Getting started</a></p>
 </div>
 {% endif %}
+  <div class="row">
+    <div class="col-lg-6"><div class="panel panel-default">
+      <h4>Last builds</h4>
+      <p>
+        {% if last_builds %}
+        <table class="table table-hover table-bordered table-condensed">
+          <thead><tr><th>Build time</th><th>Project</th><th>State</th><th></th></tr></thead>
+          <tbody>
+            {% for build in last_builds %}
+            {% if build.state == 0 %}<tr class="info">{%endif%}
+            {% if build.state == 1 %}<tr class="success">{%endif%}
+            {% if build.state == 2 %}<tr class="error">{%endif%}
+              <td width="160em">{{ build.build_time }}</td>
+              <td><a href="{% url 'projects_view' id=build.project.id %}">{{ build.project.name }}</a></td>
+              <td>
+                  {% if build.state == 0 %}In Progress{%endif%}
+                  {% if build.state == 1 %}Success{%endif%}
+                  {% if build.state == 2 %}Failed{%endif%}
+                  {% if build.state == 3 %}Cancelled{%endif%}
+              </td>
+              <td width="130em">
+                  <div class="btn-group btn-group-sm">
+                      <a class="btn btn-default" href="{% url 'build_cancel' id=build.id %}"><span class="glyphicon glyphicon-remove electric"></span></a>
 
-    <div class="col-lg-9">
-        <h4>Build queue</h4>
-        <p>
-            {% if builds %}
-            <table class="table table-hover table-bordered table-condensed">
-                <thead><tr><th>Build time</th><th>Project</th><th></th></tr></thead>
-                <tbody>
-                    {% for build in builds %}
-                    <tr class="info">
-                        <td width="180em">{{ build.build_time }}</td>
-                        <td><a href="{% url 'projects_view' id=build.project.id %}">{{ build.project.name }}</a></td>
-                        <td width="80em">
-                        {% if build.project.id %}
-                            <div class="btn-group btn-group-sm">
-                                <a class="btn btn-default" href="{% url 'build_cancel' id=build.id %}"><span class="glyphicon glyphicon-remove electric"></span></a>
-                                <a class="btn btn-default" href="{% url 'build_view' id=build.id %}"><span class="glyphicon glyphicon-list electric"></span></a>
-                            </div>
-                        {% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            {% else %}
-            No builds in progress
-            {% endif %}
-        </p>
-    </div>
+                      <a class="btn btn-default" href="{% url 'build_view' id=build.id %}"><span class="glyphicon glyphicon-list electric"></span></a>
+                      {% if build.state == 1 %}
 
-    <div class="col-lg-9">
-        <h4>Last builds</h4>
-        <p>
-            {% if last_builds %}
-            <table class="table table-hover table-bordered table-condensed">
-                <thead><tr><th>Build time</th><th>Project</th><th>State</th><th></th></tr></thead>
-                <tbody>
-                    {% for build in last_builds %}
-                    {% if build.state == 0 %}<tr class="info">{%endif%}
-                    {% if build.state == 1 %}<tr class="success">{%endif%}
-                    {% if build.state == 2 %}<tr class="error">{%endif%}
-                        <td width="160em">{{ build.build_time }}</td>
-                        <td><a href="{% url 'projects_view' id=build.project.id %}">{{ build.project.name }}</a></td>
-                        <td>
-                            {% if build.state == 0 %}In Progress{%endif%}
-                            {% if build.state == 1 %}Success{%endif%}
-                            {% if build.state == 2 %}Failed{%endif%}
-                            {% if build.state == 3 %}Cancelled{%endif%}
-                        </td>
-                        <td width="130em">
-                            <div class="btn-group btn-group-sm">
-                                <a class="btn btn-default" href="{% url 'build_cancel' id=build.id %}"><span class="glyphicon glyphicon-remove electric"></span></a>
-
-                                <a class="btn btn-default" href="{% url 'build_view' id=build.id %}"><span class="glyphicon glyphicon-list electric"></span></a>
-                                {% if build.state == 1 %}
-
-                                <div class="btn-group btn-group-sm">
-                                    <button type="button" class="btn btn-default dropdown-toggle electric" data-toggle="dropdown">
-                                    <img src="/static/images/green-rocket-22x22.png" height="16"/> &nbsp;<span class="caret"></span>
-                                    </button>
-                                    <ul class="dropdown-menu pull-right">
-                                        {% for workflow in build.project.releaseflow_set.all %}
-                                        <li class="dropdown-submenu">
-                                            <a tabindex="-1" href="#">{{workflow.name}}</a>
-                                            <ul class="dropdown-menu">
-                                                <li><a href="{% url 'workflow_push' flow=workflow.id build=build.id %}"><span class="glyphicon glyphicon-hand-right electric"></span> Push</a></li>
-                                                <li><a href="{% url 'workflow_schedule' flow=workflow.id build=build.id %}"><span class="glyphicon glyphicon-time electric"></span> Schedule</a></li>
-                                            </ul>
-                                        </li>
-                                        {% endfor %}
-                                    </ul>
-                                </div>
-                                {% endif %}
-                            </div>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            {% else %}
-            No builds
-            {% endif %}
-        </p>
-    </div>
-
+                      <div class="btn-group btn-group-sm">
+                          <button type="button" class="btn btn-default dropdown-toggle electric" data-toggle="dropdown">
+                          <img src="/static/images/green-rocket-22x22.png" height="16"/> &nbsp;<span class="caret"></span>
+                          </button>
+                          <ul class="dropdown-menu pull-right">
+                              {% for workflow in build.project.releaseflow_set.all %}
+                              <li class="dropdown-submenu">
+                                  <a tabindex="-1" href="#">{{workflow.name}}</a>
+                                  <ul class="dropdown-menu">
+                                      <li><a href="{% url 'workflow_push' flow=workflow.id build=build.id %}"><span class="glyphicon glyphicon-hand-right electric"></span> Push</a></li>
+                                      <li><a href="{% url 'workflow_schedule' flow=workflow.id build=build.id %}"><span class="glyphicon glyphicon-time electric"></span> Schedule</a></li>
+                                  </ul>
+                              </li>
+                              {% endfor %}
+                          </ul>
+                      </div>
+                      {% endif %}
+                  </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        No builds
+        {% endif %}
+      </p>
+    </div></div>
+    <div class="col-lg-6"><div class="panel panel-default">
+      <h4>Last builds</h4>
+      <p></p>
+    </div></div>
+  </div>
 {% endblock %}

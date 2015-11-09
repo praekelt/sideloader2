@@ -1,6 +1,6 @@
 <div class="col-xs-3 col-sm-3 col-md-2 col-lg-2 sidebar">
   <ul class="nav nav-sidebar">
-    <li {% if active == "home" %}class="active"{% endif %}><a href="{% url 'home' %}">Build queue</a></li>
+    <li {% if active == "home" %}class="active"{% endif %}><a href="{% url 'home' %}">Dashboard</a></li>
     <li {% if active == "projects" %}class="active"{% endif %}><a href="{% url 'projects_create' %}">Create project</a></li>
     <li {% if active == "help" %}class="active"{% endif %}><a href="{% url 'help_index' %}">Help</a></li>
   </ul>

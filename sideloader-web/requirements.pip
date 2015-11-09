@@ -17,3 +17,4 @@ pyflakes
 fabric
 pyyaml
 django-crispy-forms
+rhumba

@@ -228,7 +228,12 @@ table.table thead .sorting_desc_disabled { background: url('/static/images/sort_
 .panel-group .panel {
    overflow: visible;
 }
-
+.panel-default {
+  background-image: url(/static/images/bg_lighter.png);
+  border:1px solid #555;
+  padding-right: 1em;
+  padding-left: 1em;
+}
 .dropdown-submenu{
     position:relative;
 }
