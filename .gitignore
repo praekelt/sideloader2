@@ -9,7 +9,6 @@ __pycache__/
 .Python
 ve/
 env/
-build/
 develop-eggs/
 dist/
 downloads/
